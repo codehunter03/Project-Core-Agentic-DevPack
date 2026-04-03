@@ -39,6 +39,68 @@ body{
 ::-webkit-scrollbar-track{background:var(--s2)}
 ::-webkit-scrollbar-thumb{background:var(--s5);border-radius:3px}
 ::placeholder{color:var(--t3)}
+/* ─── PASSWORD GATE ─── */
+#gate{
+  position:fixed;inset:0;z-index:99999;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+}
+#gate.hidden{display:none}
+.gate-box{
+  width:100%;max-width:400px;padding:2.5rem 2rem;
+  background:var(--s1);border:1px solid var(--s4);
+  border-radius:16px;text-align:center;
+  box-shadow:0 0 0 1px rgba(88,166,255,.08),
+             0 24px 60px rgba(0,0,0,.7),
+             0 0 80px rgba(31,111,235,.06);
+  animation:slideup .4s cubic-bezier(.16,1,.3,1);
+}
+@keyframes slideup{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.gate-gem{
+  width:58px;height:58px;border-radius:14px;
+  background:linear-gradient(135deg,#1f6feb,#8957e5);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.6rem;margin:0 auto 1.2rem;
+  box-shadow:0 0 28px rgba(88,166,255,.25);
+}
+.gate-title{
+  font-family:'Syne',sans-serif;font-weight:900;
+  font-size:1.25rem;letter-spacing:-.3px;margin-bottom:.3rem;
+}
+.gate-sub{font-size:.7rem;color:var(--t2);margin-bottom:1.8rem;line-height:1.6}
+.gate-wrap{position:relative;margin-bottom:.75rem}
+#gate-inp{
+  width:100%;background:var(--s2);border:1px solid var(--s4);
+  border-radius:8px;color:var(--t1);
+  padding:.8rem 2.8rem .8rem 1rem;
+  font-size:1rem;font-family:inherit;text-align:center;
+  letter-spacing:.2em;transition:border-color .2s,box-shadow .2s;
+}
+#gate-inp:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(31,111,235,.12)}
+#gate-inp.shake{animation:shake .35s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%,75%{transform:translateX(-7px)}50%{transform:translateX(7px)}}
+#gate-eye{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--t3);cursor:pointer;font-size:.9rem;padding:0;
+}
+#gate-btn{
+  width:100%;
+  background:linear-gradient(135deg,var(--blue2),#8957e5);
+  color:#fff;border:none;border-radius:8px;padding:.85rem;
+  font-size:.85rem;font-weight:800;cursor:pointer;
+  font-family:'Syne',sans-serif;letter-spacing:.3px;
+  transition:all .2s;
+  box-shadow:0 4px 20px rgba(31,111,235,.25);
+  margin-bottom:.75rem;
+}
+#gate-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(56,139,253,.4)}
+#gate-err{font-size:.7rem;color:var(--red);min-height:1.1rem;transition:opacity .2s}
+.gate-foot{
+  margin-top:1.4rem;padding-top:1rem;
+  border-top:1px solid var(--s4);
+  font-size:.6rem;color:var(--t3);line-height:1.8;
+}
+
 
 /* ─── Grid noise texture overlay ─── */
 body::after{
@@ -290,6 +352,26 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 </style>
 </head>
 <body>
+
+<!-- ══ PASSWORD GATE ══ -->
+<div id="gate">
+  <div class="gate-box">
+    <div class="gate-gem">🔬</div>
+    <div class="gate-title">Agentic DevPack</div>
+    <div class="gate-sub">Enter your team access password<br>to continue</div>
+    <div class="gate-wrap">
+      <input type="password" id="gate-inp" placeholder="••••••••••"
+        autocomplete="off" onkeydown="if(event.key==='Enter')unlock()">
+      <button id="gate-eye" onclick="toggleGateEye()">👁</button>
+    </div>
+    <div id="gate-err"></div>
+    <button id="gate-btn" onclick="unlock()">🔓 Unlock DevPack</button>
+    <div class="gate-foot">
+      🔐 Access restricted to authorized team members only<br>
+      Contact your admin if you need access
+    </div>
+  </div>
+</div>
 
 <!-- ══ HEADER ══ -->
 <header>
@@ -799,5 +881,55 @@ async function runAnalysis() {
 // ══════════════════════════════════════════════
 loadKey();
 </script>
+
+<script>
+// ══ PASSWORD GATE ══
+// SHA-256 hash of the team password
+// Default password: DevPack@2024  (change this hash to change password)
+// To generate a new hash: https://emn178.github.io/online-tools/sha256.html
+const PASS_HASH = 'e34f5cbf233f274b8602ae750a3ea9a83a0e397b31cf2b9ae911b863a1557cf9';
+
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function unlock() {
+  const val = document.getElementById('gate-inp').value;
+  if (!val) { showGateErr('Please enter the password'); return; }
+  const hash = await sha256(val);
+  if (hash === PASS_HASH) {
+    sessionStorage.setItem('devpack_auth', hash);
+    document.getElementById('gate').classList.add('hidden');
+    document.getElementById('gate-err').textContent = '';
+  } else {
+    const inp = document.getElementById('gate-inp');
+    showGateErr('Incorrect password. Try again.');
+    inp.classList.add('shake');
+    inp.value = '';
+    setTimeout(() => inp.classList.remove('shake'), 400);
+  }
+}
+
+function showGateErr(msg) {
+  const e = document.getElementById('gate-err');
+  e.textContent = msg;
+  setTimeout(() => { if(e.textContent === msg) e.textContent = ''; }, 3000);
+}
+
+function toggleGateEye() {
+  const inp = document.getElementById('gate-inp');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// Check if already authenticated this session
+(function() {
+  const auth = sessionStorage.getItem('devpack_auth');
+  if (auth && auth === PASS_HASH) {
+    document.getElementById('gate').classList.add('hidden');
+  }
+})();
+</script>
+
 </body>
 </html>
