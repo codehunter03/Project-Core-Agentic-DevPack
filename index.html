@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic DevPack — Core Dump Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400&family=Syne:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #07090d;
+  --s1:       #0d1117;
+  --s2:       #161b22;
+  --s3:       #1c2128;
+  --s4:       #21262d;
+  --s5:       #30363d;
+  --t1:       #e6edf3;
+  --t2:       #8b949e;
+  --t3:       #484f58;
+  --blue:     #58a6ff;
+  --blue2:    #1f6feb;
+  --blue3:    #388bfd;
+  --green:    #56d364;
+  --green2:   #238636;
+  --red:      #ff6b6b;
+  --red2:     #da3633;
+  --orange:   #e3b341;
+  --purple:   #d2a8ff;
+  --teal:     #39d353;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'JetBrains Mono',monospace;
+  background:var(--bg); color:var(--t1);
+  min-height:100vh; overflow-x:hidden;
+}
+::selection{background:#1f6feb55}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--s2)}
+::-webkit-scrollbar-thumb{background:var(--s5);border-radius:3px}
+::placeholder{color:var(--t3)}
+
+/* ─── Grid noise texture overlay ─── */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  opacity:.4;
+}
+
+/* ─── HEADER ─── */
+header{
+  background:linear-gradient(180deg,#0d1117 0%,#07090d 100%);
+  border-bottom:1px solid var(--s4);
+  padding:0 1.5rem; height:58px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200;
+  box-shadow:0 1px 0 rgba(255,255,255,0.04);
+}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-gem{
+  width:34px;height:34px;border-radius:9px;
+  background:linear-gradient(135deg,#1f6feb,#8957e5);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;
+  box-shadow:0 0 18px rgba(88,166,255,0.25),inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.logo-name{font-family:'Syne',sans-serif;font-weight:900;font-size:.95rem;letter-spacing:-.3px}
+.logo-tag{font-size:.55rem;color:var(--t3);letter-spacing:3px;text-transform:uppercase;margin-top:1px}
+.hbadges{display:flex;gap:8px;align-items:center}
+.pill{
+  padding:3px 10px;border-radius:20px;font-size:.62rem;
+  font-weight:700;letter-spacing:.5px;border:1px solid;
+  display:inline-flex;align-items:center;gap:5px;
+}
+
+/* ─── API KEY BANNER ─── */
+#key-banner{
+  background:linear-gradient(90deg,rgba(31,111,235,.12),rgba(137,87,229,.08));
+  border-bottom:1px solid rgba(88,166,255,.15);
+  padding:.55rem 1.5rem;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-size:.72rem;
+}
+#key-banner label{color:var(--blue);white-space:nowrap;font-weight:600}
+.key-input-wrap{
+  flex:1;min-width:260px;position:relative;display:flex;align-items:center;
+}
+#api-key-input{
+  width:100%;background:var(--s1);border:1px solid var(--s4);
+  border-radius:5px;color:var(--t1);padding:5px 36px 5px 10px;
+  font-size:.72rem;font-family:inherit;transition:border-color .2s;
+}
+#api-key-input:focus{outline:none;border-color:var(--blue2)}
+#toggle-key{
+  position:absolute;right:8px;background:none;border:none;
+  color:var(--t3);cursor:pointer;font-size:.8rem;padding:0;
+}
+#save-key-btn{
+  background:var(--blue2);color:#fff;border:none;border-radius:5px;
+  padding:5px 14px;font-size:.7rem;font-weight:700;cursor:pointer;
+  font-family:inherit;transition:background .15s;white-space:nowrap;
+}
+#save-key-btn:hover{background:var(--blue3)}
+#key-status{font-size:.68rem;white-space:nowrap}
+
+/* ─── MAIN LAYOUT ─── */
+.workspace{
+  display:grid;grid-template-columns:42% 58%;
+  min-height:calc(100vh - 58px - 38px);
+}
+@media(max-width:860px){.workspace{grid-template-columns:1fr}}
+
+/* ─── LEFT PANEL ─── */
+.lpanel{
+  border-right:1px solid var(--s4);
+  padding:1.25rem;display:flex;flex-direction:column;gap:.9rem;
+}
+.section-head{
+  font-size:.6rem;color:var(--t3);
+  text-transform:uppercase;letter-spacing:3px;
+  display:flex;align-items:center;gap:8px;margin-bottom:.1rem;
+}
+.section-head::after{content:'';flex:1;height:1px;background:var(--s4)}
+.field-lbl{
+  font-size:.7rem;color:var(--blue);
+  margin-bottom:5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+}
+.field-lbl .hint{color:var(--t3);font-size:.6rem}
+textarea{
+  width:100%;background:var(--s2);border:1px solid var(--s4);
+  border-radius:6px;color:var(--t1);padding:.7rem;font-size:.72rem;
+  resize:vertical;line-height:1.65;font-family:inherit;
+  transition:border-color .2s,box-shadow .2s;
+}
+textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(31,111,235,.08)}
+.upload-lbl{
+  display:inline-block;cursor:pointer;background:var(--s3);
+  color:var(--t2);padding:3px 9px;border-radius:4px;font-size:.62rem;
+  border:1px solid var(--s5);transition:all .15s;
+}
+.upload-lbl:hover{background:var(--s4);color:var(--t1)}
+.file-ok{color:var(--green);font-size:.62rem}
+
+#run-btn{
+  background:linear-gradient(135deg,var(--blue2),#8957e5);
+  color:#fff;border:none;border-radius:8px;padding:.85rem;
+  font-size:.85rem;font-weight:800;cursor:pointer;
+  font-family:'Syne',sans-serif;letter-spacing:.3px;
+  transition:all .2s;display:flex;align-items:center;
+  justify-content:center;gap:8px;
+  box-shadow:0 4px 20px rgba(31,111,235,.25);
+  position:relative;overflow:hidden;
+}
+#run-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.08),transparent);
+}
+#run-btn:hover:not(:disabled){
+  transform:translateY(-2px);
+  box-shadow:0 6px 28px rgba(56,139,253,.35);
+}
+#run-btn:disabled{
+  background:var(--s3);color:var(--t3);cursor:not-allowed;
+  box-shadow:none;transform:none;
+}
+#err-box{
+  background:rgba(218,54,51,.1);border:1px solid var(--red2);
+  border-radius:6px;padding:.7rem;font-size:.75rem;
+  color:var(--red);display:none;line-height:1.5;
+}
+.prog-wrap{display:none;gap:6px;flex-direction:column}
+.prog-bars{display:flex;gap:3px}
+.pbar{
+  flex:1;height:2px;border-radius:2px;background:var(--s4);
+  transition:background .4s;
+}
+.pbar.done{background:var(--blue)}
+.pbar.live{background:rgba(88,166,255,.5);animation:glow 1s infinite}
+@keyframes glow{0%,100%{opacity:.4}50%{opacity:1}}
+.prog-lbl{font-size:.68rem;color:var(--t2)}
+.dots{display:flex;gap:4px;justify-content:center;padding:.6rem}
+.dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--blue);animation:pop 1.2s ease-in-out infinite;
+}
+.dot:nth-child(2){animation-delay:.2s}
+.dot:nth-child(3){animation-delay:.4s}
+@keyframes pop{0%,100%{transform:scale(.5);opacity:.3}50%{transform:scale(1);opacity:1}}
+#log-box{
+  background:var(--s1);border:1px solid var(--s4);border-radius:5px;
+  padding:.4rem .6rem;max-height:100px;overflow-y:auto;display:none;
+}
+.log-row{font-size:.65rem;padding:1px 0}
+.log-row.info{color:var(--t3)}
+.log-row.ok{color:var(--green)}
+.log-row.err{color:var(--red)}
+.log-ts{color:var(--t3);margin-right:4px}
+
+/* ─── RIGHT PANEL ─── */
+.rpanel{padding:1.25rem;display:flex;flex-direction:column;gap:.9rem;overflow:auto}
+
+.empty{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:.9rem;text-align:center;padding:3rem;color:var(--t3);
+}
+.empty-glyph{font-size:3rem;opacity:.3}
+.empty-h{font-size:.85rem;color:var(--t2);font-family:'Syne',sans-serif}
+.empty-steps{font-size:.7rem;line-height:2;text-align:left;background:var(--s2);border:1px solid var(--s4);border-radius:8px;padding:1rem 1.5rem}
+.empty-steps code{color:var(--blue);background:rgba(88,166,255,.1);padding:1px 5px;border-radius:3px}
+
+/* ─── RESULT ─── */
+#result{display:none;flex-direction:column;gap:.9rem;animation:fadein .3s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+.sumbar{border-radius:8px;padding:.9rem 1rem;border:1px solid;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.sum-icon{font-size:1.5rem}
+.sum-body{flex:1;min-width:180px}
+.sum-cat{font-family:'Syne',sans-serif;font-weight:800;font-size:.88rem;margin-bottom:3px}
+.sum-rc{font-size:.78rem;color:var(--t1);line-height:1.5}
+.sum-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+
+/* ─── TABS ─── */
+.tabs{display:flex;border-bottom:1px solid var(--s4);gap:0}
+.tab{
+  background:transparent;color:var(--t2);
+  border:none;border-bottom:2px solid transparent;
+  padding:7px 15px;cursor:pointer;font-family:inherit;
+  font-size:.72rem;font-weight:400;
+  transition:all .15s;display:flex;gap:5px;align-items:center;
+}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue);background:var(--s2);font-weight:700}
+.tab:hover:not(.on){color:var(--t1)}
+
+.tpane{display:none;padding-top:.75rem}
+.tpane.on{display:block}
+.slbl{font-size:.6rem;color:var(--t3);text-transform:uppercase;letter-spacing:2.5px;margin-bottom:5px}
+
+/* ─── CODE ─── */
+.code-box{
+  background:var(--s1);border:1px solid var(--s4);border-radius:6px;
+  overflow:auto;max-height:360px;font-size:.7rem;line-height:1.65;
+}
+.cl{display:flex;border-left:3px solid transparent}
+.cl.hl{background:rgba(218,54,51,.1);border-left-color:var(--red2)}
+.cl-n{color:var(--t3);min-width:2.8rem;padding:0 8px;user-select:none;text-align:right;flex-shrink:0}
+.cl-c{color:var(--t1);padding-right:1rem;white-space:pre}
+
+/* ─── DIFF ─── */
+.dl{display:flex;font-size:.7rem;border-left:3px solid transparent}
+.dl.add{background:rgba(86,211,100,.07);border-left-color:var(--green)}
+.dl.rem{background:rgba(218,54,51,.07);border-left-color:var(--red2)}
+.dl-m{min-width:1.4rem;color:var(--t3);padding:0 4px;user-select:none;flex-shrink:0}
+.dl.add .dl-m{color:var(--green)}
+.dl.rem .dl-m{color:var(--red)}
+.dl-n{min-width:2.8rem;color:var(--t3);padding:0 6px;user-select:none;text-align:right;flex-shrink:0}
+.dl-c{color:var(--t1);white-space:pre;padding-right:1rem}
+.dl.add .dl-c{color:var(--green)}
+.dl.rem .dl-c{color:var(--red)}
+
+/* ─── CARDS ─── */
+.card{background:var(--s2);border:1px solid var(--s4);border-radius:6px;padding:.9rem;font-size:.78rem;line-height:1.75;color:var(--t1)}
+.card.grn{background:rgba(35,134,54,.08);border-color:rgba(86,211,100,.25);color:#aff5b4}
+.card.blu{background:rgba(31,111,235,.07);border-color:rgba(88,166,255,.2);color:var(--blue)}
+.sug{
+  background:var(--s2);border:1px solid var(--s4);border-radius:6px;
+  padding:.7rem;display:flex;gap:9px;align-items:flex-start;
+  font-size:.77rem;line-height:1.65;margin-bottom:.5rem;
+}
+.sug-n{
+  background:rgba(31,111,235,.15);color:var(--blue);
+  width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:.62rem;font-weight:800;flex-shrink:0;margin-top:1px;
+}
+.dl-btn{
+  background:var(--green2);color:#fff;border:none;border-radius:5px;
+  padding:5px 13px;font-size:.68rem;cursor:pointer;font-family:inherit;
+  font-weight:700;transition:background .15s;
+}
+.dl-btn:hover{background:#2ea043}
+
+/* ─── INFO FOOTER ─── */
+.key-note{
+  font-size:.62rem;color:var(--t3);
+  background:var(--s2);border:1px solid var(--s4);
+  border-radius:5px;padding:.5rem .8rem;line-height:1.6;
+}
+.key-note a{color:var(--blue);text-decoration:none}
+.key-note a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="logo">
+    <div class="logo-gem">🔬</div>
+    <div>
+      <div class="logo-name">Agentic DevPack</div>
+      <div class="logo-tag">Core Dump Analyzer &amp; Auto-Fix Engine</div>
+    </div>
+  </div>
+  <div class="hbadges">
+    <span class="pill" style="color:#56d364;border-color:#238636;background:rgba(35,134,54,.1)">v1.0</span>
+    <span class="pill" id="model-badge" style="color:#8b949e;border-color:#30363d;background:#161b22">claude-haiku-4-5</span>
+    <span class="pill" id="key-badge" style="color:#e3b341;border-color:#e3b341;background:rgba(227,179,65,.08)">⚠ No API Key</span>
+  </div>
+</header>
+
+<!-- ══ API KEY BANNER ══ -->
+<div id="key-banner">
+  <label>🔑 Your Anthropic API Key:</label>
+  <div class="key-input-wrap">
+    <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off">
+    <button id="toggle-key" onclick="toggleKeyVis()" title="Show/hide">👁</button>
+  </div>
+  <button id="save-key-btn" onclick="saveKey()">Save Key</button>
+  <span id="key-status">Key is saved in your browser only — never sent to any server except Anthropic.</span>
+</div>
+
+<!-- ══ WORKSPACE ══ -->
+<div class="workspace">
+
+  <!-- ── LEFT: INPUT ── -->
+  <div class="lpanel">
+    <div class="section-head">📥 Input</div>
+
+    <!-- GDB Backtrace -->
+    <div>
+      <div class="field-lbl">
+        ◈ GDB Backtrace / Core Output
+        <span class="hint">gdb ./binary ./core -ex "bt full" -ex "info locals"</span>
+      </div>
+      <textarea id="bt" rows="9" placeholder="Program received signal SIGSEGV, Segmentation fault.
+0x00007f1234 in causeCrash() at crash.cpp:8
+#0  causeCrash () at crash.cpp:8
+#1  0x000055ab in main () at crash.cpp:14
+
+Thread 1 received signal SIGSEGV...
+Local variables:
+  ptr = 0x0"></textarea>
+    </div>
+
+    <!-- Source file -->
+    <div>
+      <div class="field-lbl">
+        ◈ Source File
+        <label class="upload-lbl">
+          📁 Upload
+          <input type="file" id="file-in" style="display:none"
+            accept=".c,.cpp,.cc,.cxx,.h,.hpp,.py,.go,.rs,.java,.js,.ts">
+        </label>
+        <span class="file-ok" id="file-ok"></span>
+      </div>
+      <textarea id="src" rows="13" placeholder="// Paste your source file here or upload above
+#include &lt;iostream&gt;
+using namespace std;
+
+void causeCrash() {
+    int* ptr = nullptr;
+    *ptr = 42;  // Line 8 — null dereference → SIGSEGV
+}
+
+int main() {
+    causeCrash();
+    return 0;
+}"></textarea>
+    </div>
+
+    <!-- Model selector -->
+    <div style="display:flex;align-items:center;gap:8px;font-size:.7rem;">
+      <span style="color:var(--t2)">Model:</span>
+      <select id="model-sel" style="background:var(--s2);color:var(--t1);border:1px solid var(--s4);border-radius:4px;padding:3px 8px;font-size:.7rem;font-family:inherit;cursor:pointer;">
+        <option value="claude-haiku-4-5-20251001">Haiku 4.5 — fastest, cheapest (~$0.01/analysis)</option>
+        <option value="claude-sonnet-4-20250514">Sonnet 4 — balanced (~$0.04/analysis)</option>
+      </select>
+    </div>
+
+    <!-- Error -->
+    <div id="err-box"></div>
+
+    <!-- Run button -->
+    <button id="run-btn" onclick="runAnalysis()">⚡ Run DevPack Analysis</button>
+
+    <!-- Progress -->
+    <div class="prog-wrap" id="prog">
+      <div class="prog-bars" id="pbars">
+        <div class="pbar" id="pb0"></div><div class="pbar" id="pb1"></div>
+        <div class="pbar" id="pb2"></div><div class="pbar" id="pb3"></div>
+        <div class="pbar" id="pb4"></div>
+      </div>
+      <div class="prog-lbl" id="plbl">Initializing...</div>
+      <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
+
+    <!-- Log -->
+    <div id="log-box"></div>
+
+    <!-- Key note -->
+    <div class="key-note">
+      🔐 Your API key is stored only in <strong>your browser's localStorage</strong> — it never touches any server other than <a href="https://anthropic.com" target="_blank">Anthropic's API</a> directly. Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: RESULTS ── -->
+  <div class="rpanel" id="rpanel">
+    <div class="section-head">📤 Analysis Results</div>
+
+    <!-- Empty state -->
+    <div class="empty" id="empty">
+      <div class="empty-glyph">🔬</div>
+      <div class="empty-h">Ready to Analyze</div>
+      <div class="empty-steps">
+        <div>① Enter your Anthropic API key above</div>
+        <div>② Paste GDB backtrace in the left panel</div>
+        <div>③ Paste or upload the crashing source file</div>
+        <div>④ Click <code>⚡ Run DevPack Analysis</code></div>
+      </div>
+      <div style="font-size:.62rem;color:var(--t3)">C · C++ · Python · Go · Rust · Java · JS · TS</div>
+    </div>
+
+    <!-- Result -->
+    <div id="result">
+
+      <!-- Summary -->
+      <div class="sumbar" id="sumbar">
+        <div class="sum-icon" id="s-icon">🐛</div>
+        <div class="sum-body">
+          <div class="sum-cat" id="s-cat">—</div>
+          <div class="sum-rc" id="s-rc">—</div>
+          <div class="sum-badges" id="s-badges"></div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab on" onclick="tab('analysis',this)">🔍 Analysis</button>
+        <button class="tab" onclick="tab('diff',this)">📋 Diff</button>
+        <button class="tab" onclick="tab('fixed',this)">✅ Fixed File</button>
+        <button class="tab" onclick="tab('tips',this)">💡 Suggestions</button>
+      </div>
+
+      <!-- Analysis pane -->
+      <div class="tpane on" id="tp-analysis">
+        <div style="display:flex;flex-direction:column;gap:.75rem">
+          <div><div class="slbl">Root Cause Explanation</div><div class="card" id="r-exp">—</div></div>
+          <div><div class="slbl">Fix Explanation</div><div class="card grn" id="r-fix">—</div></div>
+          <div>
+            <div class="slbl">Original Source — crash line highlighted</div>
+            <div class="code-box" id="r-orig"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diff pane -->
+      <div class="tpane" id="tp-diff">
+        <div class="slbl">Unified Diff — Original vs Fixed</div>
+        <div class="code-box" id="r-diff"></div>
+      </div>
+
+      <!-- Fixed file pane -->
+      <div class="tpane" id="tp-fixed">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div class="slbl" style="margin:0">Complete Fixed Source File</div>
+          <button class="dl-btn" onclick="dlFixed()">⬇ Download Fixed File</button>
+        </div>
+        <div class="code-box" id="r-fixed"></div>
+      </div>
+
+      <!-- Suggestions pane -->
+      <div class="tpane" id="tp-tips">
+        <div class="slbl">Defensive Coding Suggestions</div>
+        <div id="r-tips"></div>
+      </div>
+
+    </div><!-- /#result -->
+  </div><!-- /.rpanel -->
+</div><!-- /.workspace -->
+
+<script>
+// ══════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════
+const STEPS = ['Parse Backtrace','Map Source','AI Analysis','Generate Diff','Complete'];
+const SEV = {
+  Critical:{bg:'rgba(218,54,51,.12)',bdr:'#da3633',tx:'#ff6b6b'},
+  High:    {bg:'rgba(227,179,65,.1)', bdr:'#e3b341',tx:'#e3b341'},
+  Medium:  {bg:'rgba(255,215,0,.08)',  bdr:'#ffd700',tx:'#ffd700'},
+  Low:     {bg:'rgba(86,211,100,.1)', bdr:'#56d364',tx:'#56d364'},
+};
+const CONF_C = {High:'#56d364',Medium:'#e3b341',Low:'#ff8c00'};
+const BUG_ICO = {
+  'Null Pointer Dereference':'🎯','Buffer Overflow':'💥','Use-After-Free':'👻',
+  'Race Condition':'🏁','Integer Overflow':'🔢','Stack Corruption':'🗂️',
+  'Memory Leak':'💧','Double Free':'♻️','Format String':'📝','Logic Error':'🔀',
+};
+const SYS = `You are an elite systems debugging engineer specializing in C/C++/Python crash analysis.
+CRITICAL: Respond ONLY with valid JSON. Zero markdown. Zero preamble. Just the raw JSON object.
+{
+  "root_cause": "one precise sentence",
+  "bug_category": "Null Pointer Dereference|Buffer Overflow|Use-After-Free|Race Condition|Integer Overflow|Stack Corruption|Memory Leak|Double Free|Format String|Logic Error",
+  "severity": "Critical|High|Medium|Low",
+  "confidence": "High|Medium|Low",
+  "faulting_line": 0,
+  "faulting_function": "name",
+  "explanation": "2-3 paragraph detailed technical explanation",
+  "fix_explanation": "why this fix works",
+  "fixed_code": "COMPLETE source file with fix applied — every single line",
+  "patch_summary": "what changed and on which lines",
+  "defensive_suggestions": ["tip 1","tip 2","tip 3"]
+}`;
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let curResult = null, curOrig = '', curFname = 'source.cpp';
+
+// ══════════════════════════════════════════════
+//  API KEY MANAGEMENT
+// ══════════════════════════════════════════════
+function loadKey() {
+  const k = localStorage.getItem('devpack_api_key') || '';
+  document.getElementById('api-key-input').value = k;
+  updateKeyBadge(k);
+}
+function saveKey() {
+  const k = document.getElementById('api-key-input').value.trim();
+  if (!k) { setKeyStatus('⚠ Please enter a key','#e3b341'); return; }
+  if (!k.startsWith('sk-ant-')) { setKeyStatus('⚠ Key should start with sk-ant-','#ff6b6b'); return; }
+  localStorage.setItem('devpack_api_key', k);
+  setKeyStatus('✅ Key saved!','#56d364');
+  updateKeyBadge(k);
+  setTimeout(() => setKeyStatus('Key is saved in your browser only — never sent to any server except Anthropic.','#484f58'), 2500);
+}
+function setKeyStatus(msg, color) {
+  const el = document.getElementById('key-status');
+  el.textContent = msg; el.style.color = color;
+}
+function updateKeyBadge(k) {
+  const b = document.getElementById('key-badge');
+  if (k && k.startsWith('sk-ant-')) {
+    b.textContent = '✅ API Key Set';
+    b.style.color = '#56d364'; b.style.borderColor = '#238636';
+    b.style.background = 'rgba(35,134,54,.1)';
+  } else {
+    b.textContent = '⚠ No API Key';
+    b.style.color = '#e3b341'; b.style.borderColor = '#e3b341';
+    b.style.background = 'rgba(227,179,65,.08)';
+  }
+}
+function toggleKeyVis() {
+  const inp = document.getElementById('api-key-input');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+document.getElementById('api-key-input').addEventListener('keydown', e => { if(e.key==='Enter') saveKey(); });
+
+// ══════════════════════════════════════════════
+//  FILE UPLOAD
+// ══════════════════════════════════════════════
+document.getElementById('file-in').addEventListener('change', e => {
+  const f = e.target.files[0]; if(!f) return;
+  curFname = f.name;
+  document.getElementById('file-ok').textContent = '✓ ' + f.name;
+  const r = new FileReader();
+  r.onload = ev => document.getElementById('src').value = ev.target.result;
+  r.readAsText(f);
+});
+
+// ══════════════════════════════════════════════
+//  MODEL BADGE SYNC
+// ══════════════════════════════════════════════
+document.getElementById('model-sel').addEventListener('change', e => {
+  const m = e.target.value;
+  document.getElementById('model-badge').textContent =
+    m.includes('haiku') ? 'claude-haiku-4-5' : 'claude-sonnet-4';
+});
+
+// ══════════════════════════════════════════════
+//  LOGGING
+// ══════════════════════════════════════════════
+function lg(msg, type='info') {
+  const box = document.getElementById('log-box');
+  box.style.display = 'block';
+  const d = document.createElement('div');
+  d.className = 'log-row ' + type;
+  const ts = new Date().toLocaleTimeString();
+  d.innerHTML = `<span class="log-ts">[${ts}]</span> ${msg}`;
+  box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+function clearLog() {
+  const b = document.getElementById('log-box');
+  b.innerHTML = ''; b.style.display = 'none';
+}
+
+// ══════════════════════════════════════════════
+//  PROGRESS
+// ══════════════════════════════════════════════
+function setStep(n) {
+  for(let i=0;i<5;i++){
+    const b = document.getElementById('pb'+i);
+    b.className = 'pbar'+(i<n?' done':i===n?' live':'');
+  }
+  document.getElementById('plbl').textContent = STEPS[Math.min(n,4)]||'Complete';
+}
+
+// ══════════════════════════════════════════════
+//  ERROR
+// ══════════════════════════════════════════════
+function showErr(msg) {
+  const b = document.getElementById('err-box');
+  b.style.display = 'block'; b.textContent = '⚠ ' + msg;
+}
+function clearErr() {
+  const b = document.getElementById('err-box');
+  b.style.display = 'none'; b.textContent = '';
+}
+
+// ══════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════
+function tab(name, btn) {
+  document.querySelectorAll('.tpane').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('tp-'+name).classList.add('on');
+  btn.classList.add('on');
+}
+
+// ══════════════════════════════════════════════
+//  CODE RENDERER
+// ══════════════════════════════════════════════
+function renderCode(el, code, hl) {
+  el.innerHTML = '';
+  (code||'').split('\n').forEach((line,i)=>{
+    const ln = i+1, d = document.createElement('div');
+    d.className = 'cl'+(ln===hl?' hl':'');
+    d.innerHTML = `<span class="cl-n">${ln}</span><span class="cl-c">${esc(line)}</span>`;
+    el.appendChild(d);
+  });
+}
+
+// ══════════════════════════════════════════════
+//  DIFF RENDERER
+// ══════════════════════════════════════════════
+function renderDiff(el, orig, fixed) {
+  el.innerHTML = '';
+  if(!orig||!fixed){el.textContent='No diff.';return;}
+  const oL=orig.split('\n'), fL=fixed.split('\n'), H=[];
+  let i=0,j=0;
+  while(i<oL.length||j<fL.length){
+    if(oL[i]===fL[j]){H.push({t:'s',l:oL[i],n:i+1});i++;j++;}
+    else if(j>=fL.length||i<oL.length){H.push({t:'r',l:oL[i]||'',n:i+1});i++;}
+    else{H.push({t:'a',l:fL[j]||'',n:j+1});j++;}
+  }
+  const ch=H.filter(h=>h.t!=='s');
+  if(!ch.length){el.textContent='No changes detected.';return;}
+  H.filter(h=>h.t!=='s'||ch.some(c=>Math.abs(c.n-h.n)<=3)).forEach(h=>{
+    const d=document.createElement('div');
+    d.className='dl '+(h.t==='a'?'add':h.t==='r'?'rem':'');
+    const m=h.t==='a'?'+':h.t==='r'?'−':' ';
+    d.innerHTML=`<span class="dl-m">${m}</span><span class="dl-n">${h.n}</span><span class="dl-c">${esc(h.l)}</span>`;
+    el.appendChild(d);
+  });
+}
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ══════════════════════════════════════════════
+//  DOWNLOAD
+// ══════════════════════════════════════════════
+function dlFixed() {
+  if(!curResult?.fixed_code) return;
+  const blob=new Blob([curResult.fixed_code],{type:'text/plain'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url;
+  const dot=curFname.lastIndexOf('.');
+  a.download=dot>0?curFname.slice(0,dot)+'_fixed'+curFname.slice(dot):curFname+'_fixed';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════
+//  RENDER RESULT
+// ══════════════════════════════════════════════
+function renderResult(r) {
+  const sev=r.severity||'High', sc=SEV[sev]||SEV.High;
+  const sb=document.getElementById('sumbar');
+  sb.style.background=sc.bg; sb.style.borderColor=sc.bdr;
+  document.getElementById('s-icon').textContent=BUG_ICO[r.bug_category]||'🐛';
+  const sc2=document.getElementById('s-cat');
+  sc2.textContent=r.bug_category||'Unknown'; sc2.style.color=sc.tx;
+  document.getElementById('s-rc').textContent=r.root_cause||'—';
+  document.getElementById('s-badges').innerHTML=`
+    <span class="pill" style="color:${sc.tx};border-color:${sc.bdr};background:${sc.bg}">🔴 ${sev}</span>
+    <span class="pill" style="color:${CONF_C[r.confidence]||'#aaa'};border-color:${CONF_C[r.confidence]||'#aaa'};background:transparent">Confidence: ${r.confidence}</span>
+    ${r.faulting_function?`<span class="pill" style="color:#d2a8ff;border-color:#d2a8ff;background:transparent">fn: ${r.faulting_function}</span>`:''}
+    ${r.faulting_line?`<span class="pill" style="color:#58a6ff;border-color:#58a6ff;background:transparent">line: ${r.faulting_line}</span>`:''}
+  `;
+  document.getElementById('r-exp').textContent=r.explanation||'—';
+  document.getElementById('r-fix').textContent=r.fix_explanation||'—';
+  renderCode(document.getElementById('r-orig'),r.originalSource,r.faulting_line);
+  renderDiff(document.getElementById('r-diff'),r.originalSource,r.fixed_code);
+  renderCode(document.getElementById('r-fixed'),r.fixed_code,null);
+  const tips=document.getElementById('r-tips');
+  tips.innerHTML='';
+  (r.defensive_suggestions||[]).forEach((s,i)=>{
+    const d=document.createElement('div'); d.className='sug';
+    d.innerHTML=`<span class="sug-n">${i+1}</span><span>${esc(s)}</span>`;
+    tips.appendChild(d);
+  });
+  if(!(r.defensive_suggestions||[]).length) tips.textContent='No suggestions.';
+  document.getElementById('result').style.display='flex';
+  document.getElementById('empty').style.display='none';
+  // reset tab
+  document.querySelectorAll('.tpane').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('tp-analysis').classList.add('on');
+  document.querySelectorAll('.tab')[0].classList.add('on');
+}
+
+// ══════════════════════════════════════════════
+//  MAIN ANALYSIS
+// ══════════════════════════════════════════════
+async function runAnalysis() {
+  const apiKey = localStorage.getItem('devpack_api_key')||document.getElementById('api-key-input').value.trim();
+  const bt = document.getElementById('bt').value.trim();
+  const src = document.getElementById('src').value.trim();
+  const model = document.getElementById('model-sel').value;
+
+  clearErr(); clearLog();
+
+  if(!apiKey||!apiKey.startsWith('sk-ant-')){
+    showErr('Please enter and save your Anthropic API key first (above).'); return;
+  }
+  if(!bt){showErr('Please paste a GDB backtrace or core dump output.');return;}
+  if(!src){showErr('Please paste or upload the source file.');return;}
+
+  document.getElementById('result').style.display='none';
+  document.getElementById('empty').style.display='none';
+  document.getElementById('run-btn').disabled=true;
+  document.getElementById('prog').style.display='flex';
+  curOrig=src;
+
+  try {
+    lg('Parsing crash signal and backtrace...'); setStep(0); await sleep(300);
+    lg('Mapping crash location to source file...'); setStep(1); await sleep(300);
+    lg('Sending to Claude AI for root cause analysis...'); setStep(2);
+
+    const prompt=`## GDB BACKTRACE / CORE DUMP OUTPUT\n\`\`\`\n${bt}\n\`\`\`\n\n## SOURCE FILE: ${curFname}\n\`\`\`\n${src}\n\`\`\`\n\nAnalyze the crash, identify the root cause, and return the COMPLETE fixed source file.`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true',
+      },
+      body:JSON.stringify({
+        model, max_tokens:8096,
+        system:SYS,
+        messages:[{role:'user',content:prompt}],
+      }),
+    });
+
+    if(!resp.ok){
+      const err=await resp.json().catch(()=>({error:{message:resp.statusText}}));
+      throw new Error(err.error?.message||`HTTP ${resp.status}`);
+    }
+
+    const data=await resp.json();
+    const raw=data.content[0].text;
+    lg('Parsing AI response...'); setStep(3); await sleep(200);
+
+    const clean=raw.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
+    const s=clean.indexOf('{'), e=clean.lastIndexOf('}')+1;
+    const parsed=JSON.parse(clean.slice(s,e));
+    curResult={...parsed,originalSource:src,fileName:curFname};
+
+    lg('Generating diff...'); await sleep(200); setStep(4);
+    lg('✅ Analysis complete!','ok');
+    renderResult(curResult);
+
+  } catch(err) {
+    lg('❌ '+err.message,'err');
+    let hint='';
+    if(err.message.includes('401')) hint=' — Check your API key is valid.';
+    else if(err.message.includes('credit')||err.message.includes('balance')) hint=' — Add credits at console.anthropic.com';
+    else if(err.message.includes('Failed to fetch')) hint=' — Check your internet connection.';
+    showErr(err.message+hint);
+    document.getElementById('empty').style.display='flex';
+  } finally {
+    document.getElementById('run-btn').disabled=false;
+    document.getElementById('prog').style.display='none';
+  }
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+loadKey();
+</script>
+</body>
+</html>
