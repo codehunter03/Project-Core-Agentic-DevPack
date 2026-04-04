@@ -638,6 +638,79 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 }
 
 </style>
+
+<script>
+/* ══ PASSWORD GATE — Self-contained, runs before anything else ══ */
+(function() {
+  var PASS = 'DevPack@2024';
+  var HASH = 'e34f5cbf233f274b8602ae750a3ea9a83a0e397b31cf2b9ae911b863a1557cf9';
+
+  // Check session immediately
+  if (sessionStorage.getItem('devpack_ok') === '1') {
+    document.addEventListener('DOMContentLoaded', function() {
+      var g = document.getElementById('gate');
+      if (g) g.className = 'hidden';
+    });
+  }
+
+  async function doSha256(str) {
+    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(function(b) {
+      return b.toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  window.unlock = async function() {
+    var inp = document.getElementById('gate-inp');
+    var err = document.getElementById('gate-err');
+    var val = inp ? inp.value : '';
+
+    if (!val) {
+      if (err) err.textContent = 'Please enter the password';
+      return;
+    }
+
+    // Always try plain match first (works everywhere)
+    var plainOk = (val === PASS);
+    var hashOk  = false;
+
+    try {
+      var h = await doSha256(val);
+      hashOk = (h === HASH);
+    } catch(e) {}
+
+    if (plainOk || hashOk) {
+      sessionStorage.setItem('devpack_ok', '1');
+      var gate = document.getElementById('gate');
+      if (gate) gate.className = 'hidden';
+      if (err)  err.textContent = '';
+    } else {
+      if (err) {
+        err.textContent = 'Incorrect password. Try again.';
+        setTimeout(function() { err.textContent = ''; }, 3000);
+      }
+      if (inp) {
+        inp.classList.add('shake');
+        inp.value = '';
+        setTimeout(function() { inp.classList.remove('shake'); }, 400);
+      }
+    }
+  };
+
+  window.toggleGateEye = function() {
+    var inp = document.getElementById('gate-inp');
+    if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+  };
+
+  window.showGateErr = function(msg) {
+    var e = document.getElementById('gate-err');
+    if (e) {
+      e.textContent = msg;
+      setTimeout(function() { if (e.textContent === msg) e.textContent = ''; }, 3000);
+    }
+  };
+})();
+</script>
 </head>
 <body>
 
@@ -1405,256 +1478,7 @@ loadKey();
 </script>
 
 <script>
-// ══ PASSWORD GATE ══
-// SHA-256 hash of the team password
-// Default password: DevPack@2024  (change this hash to change password)
-// To generate a new hash: https://emn178.github.io/online-tools/sha256.html
-const PASS_HASH = 'e34f5cbf233f274b8602ae750a3ea9a83a0e397b31cf2b9ae911b863a1557cf9';
-
-async function sha256(msg) {
-  try {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
-    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  } catch(e) {
-    // Fallback: simple hash for non-HTTPS environments
-    return simpleFallbackHash(msg);
-  }
-}
-
-// Fallback hash for HTTP/file:// environments (not cryptographically secure, HTTPS preferred)
-function simpleFallbackHash(str) {
-  // Returns a deterministic string that matches our stored plain-text fallback
-  return '__plain__' + str;
-}
-
-// Store BOTH the SHA256 hash (for HTTPS) and plain fallback (for HTTP)
-const PASS_PLAIN = 'DevPack@2024'; // fallback plain check
-
-async function unlock() {
-  const val = document.getElementById('gate-inp').value;
-  if (!val) { showGateErr('Please enter the password'); return; }
-
-  // Try SHA-256 first (works on HTTPS / GitHub Pages)
-  let hash;
-  try {
-    hash = await sha256(val);
-  } catch(e) {
-    hash = '__plain__' + val;
-  }
-
-  const isValid = (hash === PASS_HASH) || (val === PASS_PLAIN);
-
-  if (isValid) {
-    sessionStorage.setItem('devpack_auth', 'authenticated');
-    document.getElementById('gate').classList.add('hidden');
-    document.getElementById('gate-err').textContent = '';
-  } else {
-    const inp = document.getElementById('gate-inp');
-    showGateErr('Incorrect password. Try again.');
-    inp.classList.add('shake');
-    inp.value = '';
-    setTimeout(() => inp.classList.remove('shake'), 400);
-  }
-}
-
-function showGateErr(msg) {
-  const e = document.getElementById('gate-err');
-  e.textContent = msg;
-  setTimeout(() => { if(e.textContent === msg) e.textContent = ''; }, 3000);
-}
-
-function toggleGateEye() {
-  const inp = document.getElementById('gate-inp');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-
-
-// ══════════════════════════════════════════════════════
-//  ITERATIVE FIX CHAT
-// ══════════════════════════════════════════════════════
-let chatHistory = [];   // Full conversation history sent to API
-let chatIteration = 0;  // How many follow-ups done
-
-function showFollowupSection() {
-  const sec = document.getElementById('followup-section');
-  sec.style.display = 'flex';
-  sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function addChatBubble(role, content) {
-  const box = document.getElementById('chat-history');
-  const div = document.createElement('div');
-  div.className = `chat-bubble ${role}`;
-
-  if (role === 'user') {
-    div.textContent = content;
-  } else {
-    // Parse assistant response — look for code blocks and fix sections
-    div.innerHTML = formatAssistantResponse(content);
-  }
-
-  box.appendChild(div);
-  box.scrollTop = box.scrollHeight;
-}
-
-function formatAssistantResponse(text) {
-  // Escape HTML first
-  let safe = text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-  // Format code blocks
-  safe = safe.replace(/```[\w]*
-?([\s\S]*?)```/g, (_, code) =>
-    `<pre>${code.trim()}</pre>`
-  );
-
-  // Bold **text**
-  safe = safe.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-  // Detect fix sections (lines starting with ✅ or "Fixed:" or "Fix:")
-  safe = safe.replace(/(✅[^
-]+(?:
-(?!❌|
-)[^
-]*)*)/g, match =>
-    `<div class="fix-block"><div class="fix-block-title">✅ Suggested Fix</div>${match}</div>`
-  );
-
-  // Line breaks
-  safe = safe.replace(/
-/g, '<br>');
-
-  return `<div class="cb-label">DevPack AI · Fix ${chatIteration}</div>` + safe;
-}
-
-function clearChat() {
-  chatHistory = [];
-  chatIteration = 0;
-  document.getElementById('chat-history').innerHTML = '';
-  document.getElementById('followup-input').value = '';
-}
-
-async function sendFollowup() {
-  const apiKey = localStorage.getItem('devpack_api_key') || document.getElementById('api-key-input').value.trim();
-  const userMsg = document.getElementById('followup-input').value.trim();
-  const model = document.getElementById('model-sel').value;
-
-  if (!userMsg) return;
-  if (!apiKey || !apiKey.startsWith('sk-ant-')) {
-    alert('Please save your API key first.'); return;
-  }
-  if (!curResult) {
-    alert('Please run an initial analysis first.'); return;
-  }
-
-  chatIteration++;
-  document.getElementById('send-followup-btn').disabled = true;
-  document.getElementById('followup-input').value = '';
-
-  // Show user bubble
-  addChatBubble('user', userMsg);
-
-  // Show typing indicator
-  const typing = document.getElementById('chat-typing');
-  typing.classList.add('show');
-
-  // Build conversation context — include original analysis if first followup
-  if (chatHistory.length === 0) {
-    // Seed the conversation with the original analysis as assistant context
-    const seed = `I analyzed the core dump and found the following:
-
-**Root Cause:** ${curResult.root_cause}
-**Bug Type:** ${curResult.bug_category}
-**Severity:** ${curResult.severity}
-**Faulting Function:** ${curResult.faulting_function}() at line ${curResult.faulting_line}
-
-**Explanation:** ${curResult.explanation}
-
-**Fix Applied:** ${curResult.fix_explanation}
-
-**Patch Summary:** ${curResult.patch_summary}
-
-The fixed source file was provided. Let me know if the fix worked or if you're still seeing issues.`;
-
-    chatHistory.push({ role: 'assistant', content: seed });
-  }
-
-  // Add user message to history
-  chatHistory.push({ role: 'user', content: userMsg });
-
-  // Follow-up system prompt — focused on iterative debugging
-  const followupSys = `You are an expert systems debugging engineer helping a developer fix a crash iteratively.
-
-CONTEXT: You already analyzed a crash and provided a fix. The developer is reporting back with results.
-
-YOUR JOB:
-1. Read what the developer reports — did the fix work partially? Did the crash move? Is there a new backtrace?
-2. If the crash moved to a new location — analyze the new location using the same methodology
-3. If the fix didn't work at all — reconsider your root cause analysis, you may have been wrong
-4. If the fix partially worked — identify what the remaining issue is
-5. Always provide a CONCRETE next action — never just explain without giving a fix
-
-RESPONSE FORMAT (plain text, NOT JSON this time):
-- Start with what you understand happened after the fix
-- Explain your updated analysis of the remaining/new issue
-- Give the specific code change needed (use code blocks)
-- Explain why this additional fix resolves it
-- Keep it concise and actionable — the developer wants to fix the bug, not read an essay
-
-Be honest if you need more information — ask for the new backtrace or the new source if needed.`;
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 2048,
-        system: followupSys,
-        messages: chatHistory,
-      }),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ error: { message: resp.statusText } }));
-      throw new Error(err.error?.message || `HTTP ${resp.status}`);
-    }
-
-    const data = await resp.json();
-    const assistantMsg = data.content[0].text;
-
-    // Add to history for next turn
-    chatHistory.push({ role: 'assistant', content: assistantMsg });
-
-    // Hide typing, show response
-    typing.classList.remove('show');
-    addChatBubble('assistant', assistantMsg);
-
-  } catch (err) {
-    typing.classList.remove('show');
-    const errDiv = document.createElement('div');
-    errDiv.className = 'chat-bubble assistant';
-    errDiv.style.borderColor = 'var(--red2)';
-    errDiv.innerHTML = `<div class="cb-label">Error</div>❌ ${err.message}`;
-    document.getElementById('chat-history').appendChild(errDiv);
-  } finally {
-    document.getElementById('send-followup-btn').disabled = false;
-    document.getElementById('followup-input').focus();
-  }
-}
-
-// Check if already authenticated this session
-(function() {
-  const auth = sessionStorage.getItem('devpack_auth');
-  if (auth === 'authenticated') {
-    document.getElementById('gate').classList.add('hidden');
-  }
-})();
+/* gate handled in <head> */
 </script>
 
 </body>
