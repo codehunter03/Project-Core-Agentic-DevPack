@@ -350,6 +350,78 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 .key-note a{color:var(--blue);text-decoration:none}
 .key-note a:hover{text-decoration:underline}
 
+
+/* ── CODE FIX TAB ── */
+.codefix-wrap{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:.75rem;margin-top:.75rem;
+}
+@media(max-width:860px){
+  .codefix-wrap{grid-template-columns:1fr}
+}
+.codefix-panel{display:flex;flex-direction:column;gap:.4rem}
+.codefix-header{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:.6rem .75rem;border-radius:6px;border:1px solid;
+}
+.err-header{background:rgba(218,54,51,.08);border-color:rgba(218,54,51,.3)}
+.ok-header{background:rgba(35,134,54,.08);border-color:rgba(86,211,100,.25)}
+.codefix-icon{font-size:1.1rem;flex-shrink:0;margin-top:1px}
+.codefix-title{font-weight:700;font-size:.78rem}
+.err-header .codefix-title{color:#ff6b6b}
+.ok-header .codefix-title{color:#56d364}
+.codefix-sub{font-size:.62rem;color:var(--t2);margin-top:2px}
+.codefix-box{
+  background:var(--s1);border:1px solid var(--s4);
+  border-radius:6px;overflow:auto;
+  font-size:.7rem;line-height:1.7;
+  min-height:120px;
+}
+/* context lines */
+.cf-ctx{display:flex;border-left:3px solid transparent;opacity:.45}
+.cf-ctx:hover{opacity:.7}
+/* bug line */
+.cf-bug{display:flex;flex-direction:column;border-left:3px solid var(--red2);background:rgba(218,54,51,.08)}
+.cf-bug-row{display:flex}
+.cf-annotation{
+  font-size:.65rem;color:#ffb3b3;
+  background:rgba(218,54,51,.15);
+  padding:3px 8px 3px 2.8rem;
+  border-top:1px dashed rgba(218,54,51,.2);
+  line-height:1.5;font-style:italic;
+  display:flex;gap:6px;align-items:flex-start;
+}
+/* fix line */
+.cf-fix{display:flex;flex-direction:column;border-left:3px solid var(--green);background:rgba(86,211,100,.07)}
+.cf-fix-row{display:flex}
+.cf-fix-annotation{
+  font-size:.65rem;color:#b3ffb3;
+  background:rgba(86,211,100,.12);
+  padding:3px 8px 3px 2.8rem;
+  border-top:1px dashed rgba(86,211,100,.2);
+  line-height:1.5;font-style:italic;
+  display:flex;gap:6px;align-items:flex-start;
+}
+.cf-ln{
+  min-width:2.6rem;color:var(--t3);
+  padding:0 6px;user-select:none;
+  text-align:right;flex-shrink:0;font-size:.68rem;
+}
+.cf-code{color:var(--t1);white-space:pre;padding-right:.5rem}
+.cf-bug .cf-code{color:#ffcdd2}
+.cf-fix .cf-code{color:#c8f5c8}
+.cf-ctx .cf-code{color:var(--t2)}
+/* legend */
+.cf-legend{
+  display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+  margin-top:.5rem;font-size:.62rem;color:var(--t3);
+}
+.cf-leg-item{display:flex;align-items:center;gap:4px}
+.cf-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.cf-dot.red{background:var(--red2)}
+.cf-dot.green{background:var(--green)}
+.cf-dot.grey{background:var(--t3);opacity:.5}
+
 /* ══════════════════════════════════════
    MOBILE / IPHONE RESPONSIVE STYLES
    ══════════════════════════════════════ */
@@ -627,10 +699,33 @@ int main() {
         <div style="display:flex;flex-direction:column;gap:.75rem">
           <div><div class="slbl">Root Cause Explanation</div><div class="card" id="r-exp">—</div></div>
           <div><div class="slbl">Fix Explanation</div><div class="card grn" id="r-fix">—</div></div>
-          <div>
-            <div class="slbl">Original Source — crash line highlighted</div>
-            <div class="code-box" id="r-orig"></div>
+
+          <!-- Code Fix boxes — side by side inside Analysis tab -->
+          <div class="codefix-wrap">
+            <!-- Buggy Code -->
+            <div class="codefix-panel">
+              <div class="codefix-header err-header">
+                <span class="codefix-icon">❌</span>
+                <div>
+                  <div class="codefix-title">Problematic Code</div>
+                  <div class="codefix-sub" id="cf-bug-loc">—</div>
+                </div>
+              </div>
+              <div class="codefix-box" id="cf-buggy"></div>
+            </div>
+            <!-- Fixed Code -->
+            <div class="codefix-panel">
+              <div class="codefix-header ok-header">
+                <span class="codefix-icon">✅</span>
+                <div>
+                  <div class="codefix-title">Fixed Code</div>
+                  <div class="codefix-sub" id="cf-fix-loc">—</div>
+                </div>
+              </div>
+              <div class="codefix-box" id="cf-fixed"></div>
+            </div>
           </div>
+
         </div>
       </div>
 
@@ -676,20 +771,71 @@ const BUG_ICO = {
   'Race Condition':'🏁','Integer Overflow':'🔢','Stack Corruption':'🗂️',
   'Memory Leak':'💧','Double Free':'♻️','Format String':'📝','Logic Error':'🔀',
 };
-const SYS = `You are an elite systems debugging engineer specializing in C/C++/Python crash analysis.
-CRITICAL: Respond ONLY with valid JSON. Zero markdown. Zero preamble. Just the raw JSON object.
+const SYS = `You are a world-class systems debugging engineer with 20+ years of experience analyzing core dumps, crash backtraces, and memory corruption bugs across C, C++, Python, Go, Rust, and Java codebases.
+
+YOUR MISSION: Given a GDB backtrace and a source file, you must:
+1. Precisely identify the ROOT CAUSE of the crash — not just the symptom
+2. Trace the full causal chain from the crash signal back to the original programming mistake
+3. Produce a CORRECT, COMPLETE fix that eliminates the bug without introducing new ones
+4. Explain everything with the clarity of a senior engineer doing a code review
+
+ANALYSIS METHODOLOGY — follow this reasoning chain BEFORE producing output:
+STEP 1 — Read the signal: What signal crashed the program? (SIGSEGV=memory access, SIGABRT=abort/assert, SIGFPE=arithmetic, SIGBUS=alignment)
+STEP 2 — Read the backtrace: Which frame is in the user's source file? What function, what line?
+STEP 3 — Read the source: Find the exact line. What operation is performed there? What could go wrong?
+STEP 4 — Identify the bug class: Is a pointer dereferenced without null check? Is an index used without bounds check? Is memory used after free? Is a race condition possible?
+STEP 5 — Trace the root cause: WHY is that value bad? Was it never initialized? Was it freed early? Was it passed as null by caller? Was it corrupted upstream?
+STEP 6 — Design the fix: What is the MINIMAL correct fix? Does it handle all edge cases? Does it preserve the original intent of the code?
+STEP 7 — Verify the fix mentally: Walk through the fixed code with the same inputs that caused the crash. Does it survive? Are there new failure modes?
+
+RULES FOR THE FIX:
+- The fixed_code MUST be the COMPLETE source file — every single line, nothing omitted
+- The fix must be minimal — change only what is necessary to eliminate the bug
+- The fix must be correct — no new null dereferences, no new memory leaks, no logic changes beyond the bug
+- Preserve the original coding style, indentation, and variable names
+- If the bug requires adding error handling, add it properly — not just a null check that silently ignores the error
+- For the code_fix snippets: include 3 lines of context before and after the changed lines so the reader understands the surrounding code
+
+CONFIDENCE RULES:
+- High: backtrace clearly points to a specific line in the source file AND the bug is unambiguous
+- Medium: backtrace points to the function but exact line is inferred from source analysis
+- Low: backtrace is incomplete or the source file does not contain the crashing frame
+
+SEVERITY RULES:
+- Critical: crash is deterministic and always reproducible, or involves memory corruption that could lead to security vulnerability
+- High: crash is reproducible under specific conditions, data loss possible
+- Medium: crash occurs only under unusual inputs or edge cases
+- Low: crash is cosmetic or in non-critical path
+
+OUTPUT FORMAT — respond ONLY with this exact JSON structure, zero markdown, zero preamble, zero explanation outside the JSON:
 {
-  "root_cause": "one precise sentence",
+  "root_cause": "One precise sentence naming the exact bug and its direct cause — e.g. 'conn->buf is dereferenced at line 87 without checking if conn is NULL, which was passed as NULL by handle_client() at line 142'",
   "bug_category": "Null Pointer Dereference|Buffer Overflow|Use-After-Free|Race Condition|Integer Overflow|Stack Corruption|Memory Leak|Double Free|Format String|Logic Error",
   "severity": "Critical|High|Medium|Low",
   "confidence": "High|Medium|Low",
-  "faulting_line": 0,
-  "faulting_function": "name",
-  "explanation": "2-3 paragraph detailed technical explanation",
-  "fix_explanation": "why this fix works",
-  "fixed_code": "COMPLETE source file with fix applied — every single line",
-  "patch_summary": "what changed and on which lines",
-  "defensive_suggestions": ["tip 1","tip 2","tip 3"]
+  "faulting_line": 42,
+  "faulting_function": "exact_function_name",
+  "explanation": "Paragraph 1: What exactly happens at the crash site — describe the operation, the bad value, and why the CPU/OS raises the signal. Paragraph 2: Trace backwards — where does the bad value come from? What code path leads to this state? Paragraph 3: Why did this bug exist — missing validation, incorrect assumption, race window, off-by-one, etc.",
+  "fix_explanation": "Describe precisely what lines were changed, what the change does, and why this eliminates the root cause without side effects. Mention any edge cases the fix handles.",
+  "fixed_code": "COMPLETE source file with the fix applied — every single line of the original file with only the necessary changes made",
+  "patch_summary": "e.g. Line 87: added null check for conn before dereferencing conn->buf. Line 23: initialized ptr to NULL to prevent use of uninitialized value.",
+  "defensive_suggestions": [
+    "Specific actionable suggestion directly related to this bug class — e.g. 'Use AddressSanitizer (-fsanitize=address) during development to catch this class of bugs at runtime before they reach production'",
+    "Another specific suggestion — e.g. 'Add an assert(conn != NULL) at the top of process_request() to catch callers that pass NULL during testing'",
+    "A third suggestion about code patterns or tools — e.g. 'Consider using smart pointers (std::unique_ptr) instead of raw pointers to eliminate this class of memory bugs entirely'"
+  ],
+  "code_fix": {
+    "buggy_snippet": [
+      {"line": 85, "code": "exact source line from the original file — copy it verbatim", "annotation": "label: e.g. conn is NULL here — caller passed NULL at line 142"},
+      {"line": 87, "code": "exact buggy line verbatim", "annotation": "label: dereferencing NULL pointer — causes SIGSEGV"}
+    ],
+    "fixed_snippet": [
+      {"line": 85, "code": "exact fixed line", "annotation": "label: null check added before use"},
+      {"line": 87, "code": "exact fixed line", "annotation": "label: only executes if conn is valid"}
+    ],
+    "context_before": "exact 3 lines from source immediately before the first buggy line, newline-separated",
+    "context_after": "exact 3 lines from source immediately after the last buggy line, newline-separated"
+  }
 }`;
 
 // ══════════════════════════════════════════════
@@ -861,6 +1007,107 @@ function dlFixed() {
 }
 
 // ══════════════════════════════════════════════
+//  RENDER CODE FIX TAB
+// ══════════════════════════════════════════════
+function renderCodeFix(r) {
+  const cf = r.code_fix;
+  const bugEl = document.getElementById('cf-buggy');
+  const fixEl = document.getElementById('cf-fixed');
+  bugEl.innerHTML = ''; fixEl.innerHTML = '';
+
+  if (!cf) {
+    // Fallback: extract lines around faulting_line from original source
+    const lines = (r.originalSource||'').split('
+');
+    const fl = r.faulting_line || 1;
+    const fixLines = (r.fixed_code||'').split('
+');
+    renderFallbackCodeFix(bugEl, lines, fl, 'bug');
+    renderFallbackCodeFix(fixEl, fixLines, fl, 'fix');
+    document.getElementById('cf-bug-loc').textContent = `${r.faulting_function||'unknown'}() — line ${fl}`;
+    document.getElementById('cf-fix-loc').textContent = `Patched at line ${fl}`;
+    return;
+  }
+
+  // Location labels
+  const bugLines = cf.buggy_snippet||[];
+  const fixLines2 = cf.fixed_snippet||[];
+  const firstBugLine = bugLines[0]?.line || r.faulting_line || '?';
+  const lastBugLine  = bugLines[bugLines.length-1]?.line || firstBugLine;
+  document.getElementById('cf-bug-loc').textContent =
+    `${r.faulting_function||''}() — line${bugLines.length>1?'s ':' '}${firstBugLine}${bugLines.length>1?'–'+lastBugLine:''}`;
+  document.getElementById('cf-fix-loc').textContent =
+    `Fixed line${fixLines2.length>1?'s ':' '}${fixLines2[0]?.line||'?'}${fixLines2.length>1?'–'+fixLines2[fixLines2.length-1]?.line:''}`;
+
+  // Render buggy snippet
+  renderAnnotatedSnippet(bugEl, cf.context_before, bugLines, cf.context_after, 'bug');
+  // Render fixed snippet
+  renderAnnotatedSnippet(fixEl, cf.context_before, fixLines2, cf.context_after, 'fix');
+}
+
+function renderAnnotatedSnippet(container, ctxBefore, annotatedLines, ctxAfter, type) {
+  // Context before
+  if (ctxBefore) {
+    ctxBefore.split('\n').forEach((line, i) => {
+      const d = document.createElement('div');
+      d.className = 'cf-ctx';
+      const ln = (annotatedLines[0]?.line || 1) - (ctxBefore.split('\n').length) + i;
+      d.innerHTML = `<span class="cf-ln">${ln > 0 ? ln : ''}</span><span class="cf-code">${esc(line)}</span>`;
+      container.appendChild(d);
+    });
+  }
+
+  // Annotated lines
+  annotatedLines.forEach(item => {
+    const wrapper = document.createElement('div');
+    wrapper.className = type === 'bug' ? 'cf-bug' : 'cf-fix';
+
+    const row = document.createElement('div');
+    row.className = type === 'bug' ? 'cf-bug-row' : 'cf-fix-row';
+    row.innerHTML = `<span class="cf-ln">${item.line||''}</span><span class="cf-code">${esc(item.code||'')}</span>`;
+    wrapper.appendChild(row);
+
+    // No inline annotations — labels above each box are sufficient
+    container.appendChild(wrapper);
+  });
+
+  // Context after
+  if (ctxAfter) {
+    const lastLine = annotatedLines[annotatedLines.length-1]?.line || 0;
+    ctxAfter.split('\n').forEach((line, i) => {
+      const d = document.createElement('div');
+      d.className = 'cf-ctx';
+      d.innerHTML = `<span class="cf-ln">${lastLine + i + 1}</span><span class="cf-code">${esc(line)}</span>`;
+      container.appendChild(d);
+    });
+  }
+}
+
+function renderFallbackCodeFix(container, lines, faultLine, type) {
+  const start = Math.max(0, faultLine - 4);
+  const end   = Math.min(lines.length - 1, faultLine + 3);
+  for (let i = start; i <= end; i++) {
+    const ln = i + 1;
+    const isTarget = ln === faultLine;
+    const wrapper = document.createElement('div');
+    if (isTarget) {
+      wrapper.className = type === 'bug' ? 'cf-bug' : 'cf-fix';
+      const row = document.createElement('div');
+      row.className = type === 'bug' ? 'cf-bug-row' : 'cf-fix-row';
+      row.innerHTML = `<span class="cf-ln">${ln}</span><span class="cf-code">${esc(lines[i]||'')}</span>`;
+      wrapper.appendChild(row);
+      const ann = document.createElement('div');
+      ann.className = type === 'bug' ? 'cf-annotation' : 'cf-fix-annotation';
+      // Labels above boxes explain the issue/fix
+    } else {
+      wrapper.className = 'cf-ctx';
+      wrapper.innerHTML = `<span class="cf-ln">${ln}</span><span class="cf-code">${esc(lines[i]||'')}</span>`;
+    }
+    container.appendChild(wrapper);
+  }
+}
+
+// ══════════════════════════════════════════════
 //  RENDER RESULT
 // ══════════════════════════════════════════════
 function renderResult(r) {
@@ -882,6 +1129,7 @@ function renderResult(r) {
   renderCode(document.getElementById('r-orig'),r.originalSource,r.faulting_line);
   renderDiff(document.getElementById('r-diff'),r.originalSource,r.fixed_code);
   renderCode(document.getElementById('r-fixed'),r.fixed_code,null);
+  renderCodeFix(r);
   const tips=document.getElementById('r-tips');
   tips.innerHTML='';
   (r.defensive_suggestions||[]).forEach((s,i)=>{
@@ -927,7 +1175,40 @@ async function runAnalysis() {
     lg('Mapping crash location to source file...'); setStep(1); await sleep(300);
     lg('Sending to Claude AI for root cause analysis...'); setStep(2);
 
-    const prompt=`## GDB BACKTRACE / CORE DUMP OUTPUT\n\`\`\`\n${bt}\n\`\`\`\n\n## SOURCE FILE: ${curFname}\n\`\`\`\n${src}\n\`\`\`\n\nAnalyze the crash, identify the root cause, and return the COMPLETE fixed source file.`;
+    // ── Pre-process backtrace to extract key signals ──
+    const btLines = bt.split('\n');
+    const signalLine = btLines.find(l => l.includes('signal') || l.includes('SIGSEGV') || l.includes('SIGABRT') || l.includes('SIGFPE') || l.includes('SIGBUS')) || '';
+    const frameLines = btLines.filter(l => /^#\d+/.test(l.trim())).slice(0,10).join('\n');
+    const localLines = btLines.filter(l => l.includes(' = ') && !l.startsWith('#')).slice(0,15).join('\n');
+
+    const prompt = `You are analyzing a real crash. Follow your ANALYSIS METHODOLOGY steps carefully before producing output.
+
+## CRASH SIGNAL
+${signalLine || '(see backtrace below)'}
+
+## GDB BACKTRACE (key frames)
+\`\`\`
+${frameLines || bt.slice(0, 2000)}
+\`\`\`
+
+## FULL GDB OUTPUT (locals, registers, additional context)
+\`\`\`
+${bt}
+\`\`\`
+
+## SOURCE FILE: ${curFname}
+Language: ${curFname.endsWith('.py') ? 'Python' : curFname.endsWith('.go') ? 'Go' : curFname.endsWith('.rs') ? 'Rust' : curFname.endsWith('.java') ? 'Java' : 'C/C++'}
+\`\`\`
+${src}
+\`\`\`
+
+## YOUR TASK
+1. Identify the EXACT line in ${curFname} where the crash occurs
+2. Trace the root cause — not just "null pointer" but WHY the pointer is null
+3. Produce the COMPLETE fixed source file with a minimal, correct fix
+4. Fill every field of the JSON output — especially code_fix with the exact buggy and fixed lines verbatim from the source
+
+Do not guess. If the backtrace does not clearly point to a line, say so in confidence=Low and explain what you can infer.`;
 
     const resp = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
