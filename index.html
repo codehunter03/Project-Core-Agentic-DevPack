@@ -422,6 +422,122 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 .cf-dot.green{background:var(--green)}
 .cf-dot.grey{background:var(--t3);opacity:.5}
 
+
+/* ══ ITERATIVE FIX CHAT ══ */
+#followup-section{
+  margin-top:.75rem;
+  border-top:1px solid var(--s4);
+  padding-top:.75rem;
+  display:none;
+  flex-direction:column;gap:.75rem;
+}
+.chat-label{
+  font-size:.65rem;color:var(--t2);
+  text-transform:uppercase;letter-spacing:2.5px;
+  display:flex;align-items:center;gap:8px;
+}
+.chat-label::after{content:'';flex:1;height:1px;background:var(--s4)}
+.chat-history{
+  display:flex;flex-direction:column;gap:.6rem;
+  max-height:320px;overflow-y:auto;
+  padding:.4rem;
+}
+.chat-bubble{
+  padding:.7rem .9rem;border-radius:8px;
+  font-size:.75rem;line-height:1.65;
+  animation:fadein .25s ease;
+}
+.chat-bubble.user{
+  background:rgba(31,111,235,.12);
+  border:1px solid rgba(88,166,255,.2);
+  color:var(--blue);
+  align-self:flex-end;
+  max-width:90%;border-radius:8px 8px 2px 8px;
+}
+.chat-bubble.assistant{
+  background:var(--s2);
+  border:1px solid var(--s4);
+  color:var(--t1);
+  align-self:flex-start;
+  max-width:100%;border-radius:2px 8px 8px 8px;
+}
+.chat-bubble.assistant .cb-label{
+  font-size:.6rem;color:var(--t3);
+  margin-bottom:4px;letter-spacing:1px;text-transform:uppercase;
+}
+.chat-bubble.assistant pre{
+  background:var(--s1);border:1px solid var(--s4);
+  border-radius:4px;padding:.5rem .7rem;
+  font-size:.68rem;overflow-x:auto;
+  margin:.4rem 0;white-space:pre;
+  font-family:'JetBrains Mono',monospace;
+}
+.chat-bubble.assistant .fix-block{
+  background:rgba(35,134,54,.08);
+  border:1px solid rgba(86,211,100,.2);
+  border-radius:6px;padding:.6rem .8rem;
+  margin:.5rem 0;
+}
+.chat-bubble.assistant .fix-block-title{
+  font-size:.62rem;color:var(--green);
+  text-transform:uppercase;letter-spacing:1.5px;margin-bottom:.4rem;
+}
+.chat-input-row{
+  display:flex;gap:.5rem;align-items:flex-end;
+}
+#followup-input{
+  flex:1;background:var(--s2);border:1px solid var(--s4);
+  border-radius:8px;color:var(--t1);
+  padding:.7rem .9rem;font-size:.75rem;
+  font-family:inherit;resize:none;
+  line-height:1.6;min-height:60px;max-height:140px;
+  transition:border-color .2s,box-shadow .2s;
+}
+#followup-input:focus{
+  outline:none;border-color:var(--blue2);
+  box-shadow:0 0 0 3px rgba(31,111,235,.08);
+}
+#followup-input::placeholder{color:var(--t3)}
+#send-followup-btn{
+  background:var(--blue2);color:#fff;
+  border:none;border-radius:8px;
+  padding:.7rem 1rem;font-size:.8rem;
+  cursor:pointer;font-family:'Syne',sans-serif;
+  font-weight:700;transition:all .2s;
+  white-space:nowrap;flex-shrink:0;
+  box-shadow:0 3px 12px rgba(31,111,235,.25);
+}
+#send-followup-btn:hover:not(:disabled){
+  background:var(--blue3);transform:translateY(-1px);
+}
+#send-followup-btn:disabled{
+  background:var(--s4);color:var(--t3);cursor:not-allowed;
+  transform:none;box-shadow:none;
+}
+.chat-typing{
+  display:none;align-items:center;gap:6px;
+  padding:.5rem .9rem;font-size:.7rem;color:var(--t3);
+}
+.chat-typing.show{display:flex}
+.chat-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--t3);animation:pop 1.2s ease-in-out infinite;
+}
+.chat-dot:nth-child(2){animation-delay:.2s}
+.chat-dot:nth-child(3){animation-delay:.4s}
+#clear-chat-btn{
+  background:none;border:1px solid var(--s5);
+  color:var(--t3);border-radius:5px;
+  padding:3px 10px;font-size:.62rem;
+  cursor:pointer;font-family:inherit;
+  transition:all .15s;
+}
+#clear-chat-btn:hover{color:var(--red);border-color:var(--red2)}
+@media(max-width:860px){
+  .chat-input-row{flex-direction:column}
+  #send-followup-btn{width:100%}
+}
+
 /* ══════════════════════════════════════
    MOBILE / IPHONE RESPONSIVE STYLES
    ══════════════════════════════════════ */
@@ -748,6 +864,27 @@ int main() {
       <div class="tpane" id="tp-tips">
         <div class="slbl">Defensive Coding Suggestions</div>
         <div id="r-tips"></div>
+      </div>
+
+      <!-- ══ ITERATIVE FIX CHAT ══ -->
+      <div id="followup-section">
+        <div class="chat-label">🔁 Follow-up — Still broken? Describe what happened after applying the fix</div>
+        <div class="chat-history" id="chat-history"></div>
+        <div class="chat-typing" id="chat-typing">
+          <div class="chat-dot"></div><div class="chat-dot"></div><div class="chat-dot"></div>
+          <span>DevPack is thinking...</span>
+        </div>
+        <div class="chat-input-row">
+          <textarea id="followup-input"
+            placeholder="e.g. Applied the fix but still crashing with SIGABRT at line 23... Here is the new backtrace:&#10;#0 __GI_raise&#10;#1 process_request..."
+            onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();sendFollowup()}"
+          ></textarea>
+          <button id="send-followup-btn" onclick="sendFollowup()">⚡ Send</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:.6rem;color:var(--t3)">Ctrl+Enter to send · Full crash context is remembered</div>
+          <button id="clear-chat-btn" onclick="clearChat()">🗑 Clear chat</button>
+        </div>
       </div>
 
     </div><!-- /#result -->
@@ -1145,6 +1282,10 @@ function renderResult(r) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   document.getElementById('tp-analysis').classList.add('on');
   document.querySelectorAll('.tab')[0].classList.add('on');
+  // Show follow-up chat, reset history for new analysis
+  chatHistory = []; chatIteration = 0;
+  document.getElementById('chat-history').innerHTML = '';
+  showFollowupSection();
 }
 
 // ══════════════════════════════════════════════
@@ -1301,6 +1442,186 @@ function showGateErr(msg) {
 function toggleGateEye() {
   const inp = document.getElementById('gate-inp');
   inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+
+// ══════════════════════════════════════════════════════
+//  ITERATIVE FIX CHAT
+// ══════════════════════════════════════════════════════
+let chatHistory = [];   // Full conversation history sent to API
+let chatIteration = 0;  // How many follow-ups done
+
+function showFollowupSection() {
+  const sec = document.getElementById('followup-section');
+  sec.style.display = 'flex';
+  sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function addChatBubble(role, content) {
+  const box = document.getElementById('chat-history');
+  const div = document.createElement('div');
+  div.className = `chat-bubble ${role}`;
+
+  if (role === 'user') {
+    div.textContent = content;
+  } else {
+    // Parse assistant response — look for code blocks and fix sections
+    div.innerHTML = formatAssistantResponse(content);
+  }
+
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function formatAssistantResponse(text) {
+  // Escape HTML first
+  let safe = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // Format code blocks
+  safe = safe.replace(/```[\w]*
+?([\s\S]*?)```/g, (_, code) =>
+    `<pre>${code.trim()}</pre>`
+  );
+
+  // Bold **text**
+  safe = safe.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // Detect fix sections (lines starting with ✅ or "Fixed:" or "Fix:")
+  safe = safe.replace(/(✅[^
+]+(?:
+(?!❌|
+)[^
+]*)*)/g, match =>
+    `<div class="fix-block"><div class="fix-block-title">✅ Suggested Fix</div>${match}</div>`
+  );
+
+  // Line breaks
+  safe = safe.replace(/
+/g, '<br>');
+
+  return `<div class="cb-label">DevPack AI · Fix ${chatIteration}</div>` + safe;
+}
+
+function clearChat() {
+  chatHistory = [];
+  chatIteration = 0;
+  document.getElementById('chat-history').innerHTML = '';
+  document.getElementById('followup-input').value = '';
+}
+
+async function sendFollowup() {
+  const apiKey = localStorage.getItem('devpack_api_key') || document.getElementById('api-key-input').value.trim();
+  const userMsg = document.getElementById('followup-input').value.trim();
+  const model = document.getElementById('model-sel').value;
+
+  if (!userMsg) return;
+  if (!apiKey || !apiKey.startsWith('sk-ant-')) {
+    alert('Please save your API key first.'); return;
+  }
+  if (!curResult) {
+    alert('Please run an initial analysis first.'); return;
+  }
+
+  chatIteration++;
+  document.getElementById('send-followup-btn').disabled = true;
+  document.getElementById('followup-input').value = '';
+
+  // Show user bubble
+  addChatBubble('user', userMsg);
+
+  // Show typing indicator
+  const typing = document.getElementById('chat-typing');
+  typing.classList.add('show');
+
+  // Build conversation context — include original analysis if first followup
+  if (chatHistory.length === 0) {
+    // Seed the conversation with the original analysis as assistant context
+    const seed = `I analyzed the core dump and found the following:
+
+**Root Cause:** ${curResult.root_cause}
+**Bug Type:** ${curResult.bug_category}
+**Severity:** ${curResult.severity}
+**Faulting Function:** ${curResult.faulting_function}() at line ${curResult.faulting_line}
+
+**Explanation:** ${curResult.explanation}
+
+**Fix Applied:** ${curResult.fix_explanation}
+
+**Patch Summary:** ${curResult.patch_summary}
+
+The fixed source file was provided. Let me know if the fix worked or if you're still seeing issues.`;
+
+    chatHistory.push({ role: 'assistant', content: seed });
+  }
+
+  // Add user message to history
+  chatHistory.push({ role: 'user', content: userMsg });
+
+  // Follow-up system prompt — focused on iterative debugging
+  const followupSys = `You are an expert systems debugging engineer helping a developer fix a crash iteratively.
+
+CONTEXT: You already analyzed a crash and provided a fix. The developer is reporting back with results.
+
+YOUR JOB:
+1. Read what the developer reports — did the fix work partially? Did the crash move? Is there a new backtrace?
+2. If the crash moved to a new location — analyze the new location using the same methodology
+3. If the fix didn't work at all — reconsider your root cause analysis, you may have been wrong
+4. If the fix partially worked — identify what the remaining issue is
+5. Always provide a CONCRETE next action — never just explain without giving a fix
+
+RESPONSE FORMAT (plain text, NOT JSON this time):
+- Start with what you understand happened after the fix
+- Explain your updated analysis of the remaining/new issue
+- Give the specific code change needed (use code blocks)
+- Explain why this additional fix resolves it
+- Keep it concise and actionable — the developer wants to fix the bug, not read an essay
+
+Be honest if you need more information — ask for the new backtrace or the new source if needed.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 2048,
+        system: followupSys,
+        messages: chatHistory,
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: { message: resp.statusText } }));
+      throw new Error(err.error?.message || `HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const assistantMsg = data.content[0].text;
+
+    // Add to history for next turn
+    chatHistory.push({ role: 'assistant', content: assistantMsg });
+
+    // Hide typing, show response
+    typing.classList.remove('show');
+    addChatBubble('assistant', assistantMsg);
+
+  } catch (err) {
+    typing.classList.remove('show');
+    const errDiv = document.createElement('div');
+    errDiv.className = 'chat-bubble assistant';
+    errDiv.style.borderColor = 'var(--red2)';
+    errDiv.innerHTML = `<div class="cb-label">Error</div>❌ ${err.message}`;
+    document.getElementById('chat-history').appendChild(errDiv);
+  } finally {
+    document.getElementById('send-followup-btn').disabled = false;
+    document.getElementById('followup-input').focus();
+  }
 }
 
 // Check if already authenticated this session
