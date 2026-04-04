@@ -1227,11 +1227,9 @@ function renderCodeFix(r) {
 
   if (!cf) {
     // Fallback: extract lines around faulting_line from original source
-    const lines = (r.originalSource||'').split('
-');
+    const lines = (r.originalSource||'').split('\n');
     const fl = r.faulting_line || 1;
-    const fixLines = (r.fixed_code||'').split('
-');
+    const fixLines = (r.fixed_code||'').split('\n');
     renderFallbackCodeFix(bugEl, lines, fl, 'bug');
     renderFallbackCodeFix(fixEl, fixLines, fl, 'fix');
     document.getElementById('cf-bug-loc').textContent = `${r.faulting_function||'unknown'}() — line ${fl}`;
