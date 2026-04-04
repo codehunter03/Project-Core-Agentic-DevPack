@@ -163,7 +163,25 @@ header{
   font-family:inherit;transition:background .15s;white-space:nowrap;
 }
 #save-key-btn:hover{background:var(--blue3)}
+#test-key-btn{
+  background:none;color:var(--teal);border:1px solid rgba(57,211,83,.35);border-radius:5px;
+  padding:5px 11px;font-size:.7rem;font-weight:700;cursor:pointer;
+  font-family:inherit;transition:all .15s;white-space:nowrap;display:none;
+}
+#test-key-btn:hover{background:rgba(57,211,83,.08)}
+#test-key-btn:disabled{opacity:.5;cursor:not-allowed}
+#clear-key-btn{
+  background:none;color:var(--red);border:1px solid var(--red2);border-radius:5px;
+  padding:5px 11px;font-size:.7rem;font-weight:700;cursor:pointer;
+  font-family:inherit;transition:all .15s;white-space:nowrap;display:none;
+}
+#clear-key-btn:hover{background:rgba(218,54,51,.12)}
 #key-status{font-size:.68rem;white-space:nowrap}
+#key-warning{
+  font-size:.65rem;color:var(--orange);
+  background:rgba(227,179,65,.08);border:1px solid rgba(227,179,65,.2);
+  border-radius:4px;padding:3px 9px;white-space:nowrap;display:none;
+}
 
 /* ─── MAIN LAYOUT ─── */
 .workspace{
@@ -202,6 +220,10 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 }
 .upload-lbl:hover{background:var(--s4);color:var(--t1)}
 .file-ok{color:var(--green);font-size:.62rem}
+#src-size{font-size:.62rem;margin-left:4px}
+#src-size.ok{color:var(--t3)}
+#src-size.warn{color:var(--orange)}
+#src-size.over{color:var(--red);font-weight:700}
 
 #run-btn{
   background:linear-gradient(135deg,var(--blue2),#8957e5);
@@ -563,6 +585,8 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
   #api-key-input{font-size:.7rem;padding:5px 30px 5px 8px}
   #save-key-btn{padding:5px 10px;font-size:.65rem}
   #key-status{display:none}
+  #key-warning{display:none!important}
+  #clear-key-btn{font-size:.62rem;padding:4px 8px}
 
   /* Workspace — stack vertically */
   .workspace{
@@ -642,7 +666,8 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 <script>
 /* ══ PASSWORD GATE — Self-contained, runs before anything else ══ */
 (function() {
-  var PASS = 'DevPack@2024';
+  // NOTE: This gate is a friction layer only — the password hash is visible in source.
+  // Real access control is enforced by requiring each user to supply their own Anthropic API key.
   var HASH = 'e34f5cbf233f274b8602ae750a3ea9a83a0e397b31cf2b9ae911b863a1557cf9';
 
   // Check session immediately
@@ -670,16 +695,13 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
       return;
     }
 
-    // Always try plain match first (works everywhere)
-    var plainOk = (val === PASS);
-    var hashOk  = false;
-
+    var hashOk = false;
     try {
       var h = await doSha256(val);
       hashOk = (h === HASH);
     } catch(e) {}
 
-    if (plainOk || hashOk) {
+    if (hashOk) {
       sessionStorage.setItem('devpack_ok', '1');
       var gate = document.getElementById('gate');
       if (gate) gate.className = 'hidden';
@@ -728,8 +750,8 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
     <div id="gate-err"></div>
     <button id="gate-btn" onclick="unlock()">🔓 Unlock DevPack</button>
     <div class="gate-foot">
-      🔐 Access restricted to authorized team members only<br>
-      Contact your admin if you need access
+      🔐 Team access gate — each user also needs their own Anthropic API key to run analyses<br>
+      Contact your admin if you need the team password
     </div>
   </div>
 </div>
@@ -758,6 +780,9 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
     <button id="toggle-key" onclick="toggleKeyVis()" title="Show/hide">👁</button>
   </div>
   <button id="save-key-btn" onclick="saveKey()">Save Key</button>
+  <button id="test-key-btn" onclick="testKey()" title="Verify key works against Anthropic API">⚡ Test Key</button>
+  <button id="clear-key-btn" onclick="clearKey()" title="Remove API key from this browser">🗑 Clear Key</button>
+  <span id="key-warning">⚠ Visible in DevTools Network tab while in use — avoid high-credit keys on shared machines</span>
   <span id="key-status">Key is saved in your browser only — never sent to any server except Anthropic.</span>
 </div>
 
@@ -794,6 +819,7 @@ Local variables:
             accept=".c,.cpp,.cc,.cxx,.h,.hpp,.py,.go,.rs,.java,.js,.ts">
         </label>
         <span class="file-ok" id="file-ok"></span>
+        <span id="src-size"></span>
       </div>
       <textarea id="src" rows="13" placeholder="// Paste your source file here or upload above
 #include &lt;iostream&gt;
@@ -815,7 +841,7 @@ int main() {
       <span style="color:var(--t2)">Model:</span>
       <select id="model-sel" style="background:var(--s2);color:var(--t1);border:1px solid var(--s4);border-radius:4px;padding:3px 8px;font-size:.7rem;font-family:inherit;cursor:pointer;">
         <option value="claude-haiku-4-5-20251001">Haiku 4.5 — fastest, cheapest (~$0.01/analysis)</option>
-        <option value="claude-sonnet-4-20250514">Sonnet 4 — balanced (~$0.04/analysis)</option>
+        <option value="claude-sonnet-4-5-20251001">Sonnet 4.5 — balanced (~$0.04/analysis)</option>
       </select>
     </div>
 
@@ -842,6 +868,11 @@ int main() {
     <!-- Key note -->
     <div class="key-note">
       🔐 Your API key is stored only in <strong>your browser's localStorage</strong> — it never touches any server other than <a href="https://anthropic.com" target="_blank">Anthropic's API</a> directly. Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+    </div>
+
+    <!-- Privacy note -->
+    <div class="key-note" style="border-color:rgba(227,179,65,.25);background:rgba(227,179,65,.05);">
+      ⚠ <strong>Source code privacy:</strong> your backtrace and source file are sent directly to Anthropic's API for analysis. Do not paste proprietary, classified, or NDA-protected code. Use sanitised/anonymised excerpts for sensitive codebases. Anthropic's <a href="https://www.anthropic.com/legal/privacy" target="_blank">Privacy Policy</a> applies.
     </div>
   </div>
 
@@ -1067,11 +1098,73 @@ function loadKey() {
 }
 function saveKey() {
   const k = document.getElementById('api-key-input').value.trim();
-  if (!k) { setKeyStatus('⚠ Please enter a key','#e3b341'); return; }
-  if (!k.startsWith('sk-ant-')) { setKeyStatus('⚠ Key should start with sk-ant-','#ff6b6b'); return; }
+  if (!k) {
+    setKeyStatus('⚠ No key entered — paste your Anthropic API key above', '#e3b341'); return;
+  }
+  if (!k.startsWith('sk-ant-')) {
+    setKeyStatus('⚠ Invalid format — Anthropic keys start with sk-ant-', '#ff6b6b'); return;
+  }
+  if (k.length < 40) {
+    setKeyStatus('⚠ Key looks too short — copy the full key from console.anthropic.com', '#ff6b6b'); return;
+  }
+  if (/\s/.test(k)) {
+    setKeyStatus('⚠ Key contains spaces — paste it without extra whitespace', '#ff6b6b'); return;
+  }
   localStorage.setItem('devpack_api_key', k);
-  setKeyStatus('✅ Key saved!','#56d364');
+  setKeyStatus('✅ Key saved! Click ⚡ Test Key to verify it works.', '#56d364');
   updateKeyBadge(k);
+  setTimeout(() => setKeyStatus('Key is saved in your browser only — never sent to any server except Anthropic.', '#484f58'), 3500);
+}
+async function testKey() {
+  const k = localStorage.getItem('devpack_api_key') || '';
+  const btn = document.getElementById('test-key-btn');
+  if (!k) { setKeyStatus('⚠ Save a key first before testing', '#e3b341'); return; }
+  btn.disabled = true;
+  btn.textContent = '⏳ Testing...';
+  setKeyStatus('Pinging Anthropic API...', '#8b949e');
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': k,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'hi' }],
+      }),
+    });
+    if (resp.ok) {
+      setKeyStatus('✅ Key is valid and working — you\'re good to go!', '#56d364');
+    } else {
+      const body = await resp.json().catch(() => ({}));
+      const msg  = body.error?.message || `HTTP ${resp.status}`;
+      setKeyStatus('❌ ' + apiErrHint(resp.status, msg), '#ff6b6b');
+    }
+  } catch (e) {
+    setKeyStatus('❌ Network error — check your internet connection', '#ff6b6b');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ Test Key';
+  }
+}
+function apiErrHint(status, msg) {
+  if (status === 401) return 'Invalid key — double-check it at console.anthropic.com';
+  if (status === 403) return 'Key lacks permissions — check your Anthropic account plan';
+  if (status === 429) return 'Rate limited — wait a moment and try again';
+  if (status === 500 || status === 529) return 'Anthropic API is temporarily down — try again in a few minutes';
+  if (msg.includes('credit') || msg.includes('balance')) return 'No credits — add billing at console.anthropic.com/settings/billing';
+  return msg;
+}
+function clearKey() {
+  if (!confirm('Remove your API key from this browser?')) return;
+  localStorage.removeItem('devpack_api_key');
+  document.getElementById('api-key-input').value = '';
+  setKeyStatus('Key cleared.','#e3b341');
+  updateKeyBadge('');
   setTimeout(() => setKeyStatus('Key is saved in your browser only — never sent to any server except Anthropic.','#484f58'), 2500);
 }
 function setKeyStatus(msg, color) {
@@ -1080,14 +1173,23 @@ function setKeyStatus(msg, color) {
 }
 function updateKeyBadge(k) {
   const b = document.getElementById('key-badge');
+  const clearBtn = document.getElementById('clear-key-btn');
+  const testBtn  = document.getElementById('test-key-btn');
+  const warning  = document.getElementById('key-warning');
   if (k && k.startsWith('sk-ant-')) {
     b.textContent = '✅ API Key Set';
     b.style.color = '#56d364'; b.style.borderColor = '#238636';
     b.style.background = 'rgba(35,134,54,.1)';
+    if (clearBtn) clearBtn.style.display = 'inline-block';
+    if (testBtn)  testBtn.style.display  = 'inline-block';
+    if (warning)  warning.style.display  = 'inline-block';
   } else {
     b.textContent = '⚠ No API Key';
     b.style.color = '#e3b341'; b.style.borderColor = '#e3b341';
     b.style.background = 'rgba(227,179,65,.08)';
+    if (clearBtn) clearBtn.style.display = 'none';
+    if (testBtn)  testBtn.style.display  = 'none';
+    if (warning)  warning.style.display  = 'none';
   }
 }
 function toggleKeyVis() {
@@ -1099,14 +1201,45 @@ document.getElementById('api-key-input').addEventListener('keydown', e => { if(e
 // ══════════════════════════════════════════════
 //  FILE UPLOAD
 // ══════════════════════════════════════════════
+// ── Source size thresholds (chars) ──
+const SRC_WARN  = 15_000;   // ~3 000 tokens — yellow warning
+const SRC_LIMIT = 40_000;   // ~8 000 tokens — hard block
+
+function checkSrcSize() {
+  const len = (document.getElementById('src').value || '').length;
+  const el  = document.getElementById('src-size');
+  if (!el) return;
+  if (len === 0) { el.textContent = ''; el.className = ''; return; }
+  const kb = (len / 1024).toFixed(1);
+  if (len > SRC_LIMIT) {
+    el.textContent = `⚠ ${kb} KB — too large, analysis will fail`;
+    el.className = 'over';
+  } else if (len > SRC_WARN) {
+    el.textContent = `⚠ ${kb} KB — large file, may hit token limit`;
+    el.className = 'warn';
+  } else {
+    el.textContent = `${kb} KB`;
+    el.className = 'ok';
+  }
+}
+
 document.getElementById('file-in').addEventListener('change', e => {
   const f = e.target.files[0]; if(!f) return;
   curFname = f.name;
   document.getElementById('file-ok').textContent = '✓ ' + f.name;
   const r = new FileReader();
-  r.onload = ev => document.getElementById('src').value = ev.target.result;
+  r.onload = ev => {
+    document.getElementById('src').value = ev.target.result;
+    checkSrcSize();
+  };
+  r.onerror = () => {
+    document.getElementById('file-ok').textContent = '';
+    showErr('Could not read file — make sure it is a plain text source file.');
+  };
   r.readAsText(f);
 });
+
+document.getElementById('src').addEventListener('input', checkSrcSize);
 
 // ══════════════════════════════════════════════
 //  MODEL BADGE SYNC
@@ -1206,6 +1339,27 @@ function renderDiff(el, orig, fixed) {
 
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ══════════════════════════════════════════════
+//  FETCH WITH RETRY (rate-limit aware)
+// ══════════════════════════════════════════════
+async function fetchWithRetry(url, options, onStatus) {
+  const MAX_RETRIES = 3;
+  let attempt = 0;
+  while (true) {
+    const resp = await fetch(url, options);
+    if (resp.status !== 429 || attempt >= MAX_RETRIES) return resp;
+    attempt++;
+    // Anthropic sends retry-after in seconds; fall back to exponential backoff
+    const wait = parseInt(resp.headers.get('retry-after') || '') || (attempt * 15);
+    // Live countdown
+    for (let s = wait; s > 0; s--) {
+      if (onStatus) onStatus(`⏳ Rate limited — retrying in ${s}s (attempt ${attempt}/${MAX_RETRIES})…`);
+      await sleep(1000);
+    }
+    if (onStatus) onStatus(`↩ Retrying now (attempt ${attempt}/${MAX_RETRIES})…`);
+  }
+}
 
 // ══════════════════════════════════════════════
 //  DOWNLOAD
@@ -1358,19 +1512,8 @@ function renderResult(r) {
   document.getElementById('tp-analysis').classList.add('on');
   document.querySelectorAll('.tab')[0].classList.add('on');
   // Show follow-up chat, reset history for new analysis
-  chatHistory = []; chatIteration = 0; document.getElementById("chat-history").innerHTML = "";
-  document.getElementById('chat-history').innerHTML = '';
+  chatHistory = []; chatIteration = 0; document.getElementById('chat-history').innerHTML = '';
   showFollowupSection();
-}
-
-function showFollowupSection() {
-  const sec = document.getElementById('followup-section');
-  if (sec) {
-    sec.style.display = 'flex';
-    setTimeout(function() {
-      sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 300);
-  }
 }
 
 // ══════════════════════════════════════════════
@@ -1389,6 +1532,10 @@ async function runAnalysis() {
   }
   if(!bt){showErr('Please paste a GDB backtrace or core dump output.');return;}
   if(!src){showErr('Please paste or upload the source file.');return;}
+  if(src.length > SRC_LIMIT){
+    showErr(`Source file is too large (${(src.length/1024).toFixed(1)} KB). Paste only the relevant section — the function that crashes and its immediate callers — to stay within the token limit.`);
+    return;
+  }
 
   document.getElementById('result').style.display='none';
   document.getElementById('empty').style.display='none';
@@ -1436,20 +1583,24 @@ ${src}
 
 Do not guess. If the backtrace does not clearly point to a line, say so in confidence=Low and explain what you can infer.`;
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true',
+    const resp = await fetchWithRetry(
+      'https://api.anthropic.com/v1/messages',
+      {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true',
+        },
+        body:JSON.stringify({
+          model, max_tokens:8096,
+          system:SYS,
+          messages:[{role:'user',content:prompt}],
+        }),
       },
-      body:JSON.stringify({
-        model, max_tokens:8096,
-        system:SYS,
-        messages:[{role:'user',content:prompt}],
-      }),
-    });
+      (msg) => { lg(msg, 'info'); document.getElementById('plbl').textContent = msg; }
+    );
 
     if(!resp.ok){
       const err=await resp.json().catch(()=>({error:{message:resp.statusText}}));
@@ -1471,11 +1622,24 @@ Do not guess. If the backtrace does not clearly point to a line, say so in confi
 
   } catch(err) {
     lg('❌ '+err.message,'err');
-    let hint='';
-    if(err.message.includes('401')) hint=' — Check your API key is valid.';
-    else if(err.message.includes('credit')||err.message.includes('balance')) hint=' — Add credits at console.anthropic.com';
-    else if(err.message.includes('Failed to fetch')) hint=' — Check your internet connection.';
-    showErr(err.message+hint);
+    let display = err.message;
+    const s = parseInt(err.message);
+    if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+      display = 'Network error — check your internet connection and try again.';
+    } else if (err.message.includes('401')) {
+      display = 'Invalid API key — clear it, re-paste from console.anthropic.com, and try again.';
+    } else if (err.message.includes('403')) {
+      display = 'API key lacks permissions — check your Anthropic account plan.';
+    } else if (err.message.includes('429')) {
+      display = 'Rate limited — wait 30 seconds and try again.';
+    } else if (err.message.includes('500') || err.message.includes('529')) {
+      display = 'Anthropic API is temporarily unavailable — try again in a few minutes.';
+    } else if (err.message.includes('credit') || err.message.includes('balance')) {
+      display = 'No credits remaining — add billing at console.anthropic.com/settings/billing';
+    } else if (err.message.includes('JSON') || err.message.includes('Unexpected token')) {
+      display = 'AI response was not in the expected format — your input may be too large. Try a shorter source file.';
+    }
+    showErr(display);
     document.getElementById('empty').style.display='flex';
   } finally {
     document.getElementById('run-btn').disabled=false;
@@ -1556,10 +1720,10 @@ async function sendFollowup() {
 
   if (!userMsg) return;
   if (!apiKey || !apiKey.startsWith('sk-ant-')) {
-    alert('Please save your API key first.'); return;
+    addChatBubble('assistant', '⚠ No API key saved — enter and save your Anthropic API key in the banner above.'); return;
   }
   if (!curResult) {
-    alert('Please run an initial analysis first.'); return;
+    addChatBubble('assistant', '⚠ No analysis yet — run a DevPack analysis first, then use this chat to follow up.'); return;
   }
 
   chatIteration++;
@@ -1596,21 +1760,29 @@ async function sendFollowup() {
     + 'then give the specific fix. Be concise and actionable.';
 
   try {
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
+    var resp = await fetchWithRetry(
+      'https://api.anthropic.com/v1/messages',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: (document.getElementById('model-sel') || {}).value || 'claude-haiku-4-5-20251001',
+          max_tokens: 2048,
+          system: followupSys,
+          messages: chatHistory
+        })
       },
-      body: JSON.stringify({
-        model: model ? model.value : 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
-        system: followupSys,
-        messages: chatHistory
-      })
-    });
+      (msg) => {
+        var t = document.getElementById('chat-typing');
+        var sp = t ? t.querySelector('span') : null;
+        if (sp) sp.textContent = msg;
+      }
+    );
 
     if (!resp.ok) {
       var ed = await resp.json().catch(function(){ return {error:{message:resp.statusText}}; });
