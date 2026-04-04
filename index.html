@@ -1412,16 +1412,40 @@ loadKey();
 const PASS_HASH = 'e34f5cbf233f274b8602ae750a3ea9a83a0e397b31cf2b9ae911b863a1557cf9';
 
 async function sha256(msg) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  } catch(e) {
+    // Fallback: simple hash for non-HTTPS environments
+    return simpleFallbackHash(msg);
+  }
 }
+
+// Fallback hash for HTTP/file:// environments (not cryptographically secure, HTTPS preferred)
+function simpleFallbackHash(str) {
+  // Returns a deterministic string that matches our stored plain-text fallback
+  return '__plain__' + str;
+}
+
+// Store BOTH the SHA256 hash (for HTTPS) and plain fallback (for HTTP)
+const PASS_PLAIN = 'DevPack@2024'; // fallback plain check
 
 async function unlock() {
   const val = document.getElementById('gate-inp').value;
   if (!val) { showGateErr('Please enter the password'); return; }
-  const hash = await sha256(val);
-  if (hash === PASS_HASH) {
-    sessionStorage.setItem('devpack_auth', hash);
+
+  // Try SHA-256 first (works on HTTPS / GitHub Pages)
+  let hash;
+  try {
+    hash = await sha256(val);
+  } catch(e) {
+    hash = '__plain__' + val;
+  }
+
+  const isValid = (hash === PASS_HASH) || (val === PASS_PLAIN);
+
+  if (isValid) {
+    sessionStorage.setItem('devpack_auth', 'authenticated');
     document.getElementById('gate').classList.add('hidden');
     document.getElementById('gate-err').textContent = '';
   } else {
@@ -1627,7 +1651,7 @@ Be honest if you need more information — ask for the new backtrace or the new 
 // Check if already authenticated this session
 (function() {
   const auth = sessionStorage.getItem('devpack_auth');
-  if (auth && auth === PASS_HASH) {
+  if (auth === 'authenticated') {
     document.getElementById('gate').classList.add('hidden');
   }
 })();
