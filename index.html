@@ -163,6 +163,13 @@ header{
   font-family:inherit;transition:background .15s;white-space:nowrap;
 }
 #save-key-btn:hover{background:var(--blue3)}
+#test-key-btn{
+  background:none;border:1px solid var(--s5);color:var(--t2);
+  border-radius:5px;padding:5px 10px;font-size:.68rem;
+  cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;
+}
+#test-key-btn:hover{color:var(--blue);border-color:var(--blue2)}
+#test-key-btn:disabled{color:var(--t3);cursor:not-allowed;opacity:.5}
 #clear-key-btn{
   background:none;border:1px solid var(--s5);color:var(--t3);
   border-radius:5px;padding:5px 10px;font-size:.68rem;
@@ -643,6 +650,7 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
   .key-input-wrap{min-width:0;flex:1}
   #api-key-input{font-size:.7rem;padding:5px 30px 5px 8px}
   #save-key-btn{padding:5px 10px;font-size:.65rem}
+  #test-key-btn{padding:5px 8px;font-size:.62rem}
   #key-status{display:none}
 
   /* Workspace — stack vertically */
@@ -839,6 +847,7 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
     <button id="toggle-key" onclick="toggleKeyVis()" title="Show/hide">👁</button>
   </div>
   <button id="save-key-btn" onclick="saveKey()">Save Key</button>
+  <button id="test-key-btn" onclick="testApiKey()" title="Verify your API key works">⚡ Test Key</button>
   <button id="clear-key-btn" onclick="clearApiKey()" title="Remove saved API key from this browser">🗑 Clear Key</button>
   <span id="key-status">Key saved in <strong>your browser only</strong> — never shared. Each team member uses their own key.</span>
 </div>
@@ -1188,6 +1197,68 @@ function updateKeyBadge(k) {
     b.style.background = 'rgba(227,179,65,.08)';
   }
 }
+async function testApiKey() {
+  var apiKey = localStorage.getItem('devpack_api_key') ||
+               document.getElementById('api-key-input').value.trim();
+  var btn    = document.getElementById('test-key-btn');
+
+  if (!apiKey || !apiKey.startsWith('sk-ant-')) {
+    setKeyStatus('⚠ Save a valid key first (starts with sk-ant-)', '#e3b341');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Testing...';
+  setKeyStatus('Testing your API key...', '#8b949e');
+
+  try {
+    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 5,
+        messages: [{ role: 'user', content: 'hi' }]
+      })
+    });
+
+    if (resp.status === 200) {
+      setKeyStatus('✅ Key is valid and working!', '#56d364');
+      updateKeyBadge(apiKey);
+      btn.textContent = '✅ Valid';
+      setTimeout(function() { btn.textContent = '⚡ Test Key'; }, 3000);
+    } else if (resp.status === 401) {
+      setKeyStatus('❌ Invalid key — check at console.anthropic.com', '#ff6b6b');
+      updateKeyBadge('');
+      btn.textContent = '❌ Invalid';
+      setTimeout(function() { btn.textContent = '⚡ Test Key'; }, 3000);
+    } else if (resp.status === 402) {
+      setKeyStatus('⚠ Key valid but no credits — add at console.anthropic.com/settings/billing', '#e3b341');
+      updateKeyBadge(apiKey);
+      btn.textContent = '⚠ No Credits';
+      setTimeout(function() { btn.textContent = '⚡ Test Key'; }, 4000);
+    } else if (resp.status === 429) {
+      setKeyStatus('⚠ Key valid but rate limited — wait 30s and retry', '#e3b341');
+      updateKeyBadge(apiKey);
+      btn.textContent = '⚠ Rate Limited';
+      setTimeout(function() { btn.textContent = '⚡ Test Key'; }, 3000);
+    } else {
+      setKeyStatus('⚠ Unexpected response: HTTP ' + resp.status, '#e3b341');
+      btn.textContent = '⚡ Test Key';
+    }
+  } catch(err) {
+    setKeyStatus('❌ Connection error — check your internet', '#ff6b6b');
+    btn.textContent = '⚡ Test Key';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function clearApiKey() {
   localStorage.removeItem('devpack_api_key');
   var inp = document.getElementById('api-key-input');
