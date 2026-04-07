@@ -1467,20 +1467,13 @@ function renderResult(r) {
   document.getElementById('tp-analysis').classList.add('on');
   document.querySelectorAll('.tab')[0].classList.add('on');
   // Show follow-up chat, reset history for new analysis
-  chatHistory = []; chatIteration = 0; document.getElementById("chat-history").innerHTML = "";
-  document.getElementById('chat-history').innerHTML = '';
+  chatHistory = []; chatIteration = 0;
+  var ch = document.getElementById('chat-history');
+  if (ch) ch.innerHTML = '';
   showFollowupSection();
 }
 
-function showFollowupSection() {
-  const sec = document.getElementById('followup-section');
-  if (sec) {
-    sec.style.display = 'flex';
-    setTimeout(function() {
-      sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 300);
-  }
-}
+
 
 // ══════════════════════════════════════════════
 //  MAIN ANALYSIS
@@ -1595,9 +1588,13 @@ Do not guess. If the backtrace does not clearly point to a line, say so in confi
     const raw=data.content[0].text;
     lg('Parsing AI response...'); setStep(3); await sleep(200);
 
-    const clean=raw.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
-    const s=clean.indexOf('{'), e=clean.lastIndexOf('}')+1;
-    const parsed=JSON.parse(clean.slice(s,e));
+    var parsed;
+    try {
+      parsed = extractJSON(raw);
+    } catch(parseErr) {
+      lg('⚠️ ' + parseErr.message, 'err');
+      throw parseErr;
+    }
     curResult={...parsed,originalSource:src,fileName:curFname};
 
     lg('Generating diff...'); await sleep(200); setStep(4);
@@ -1957,9 +1954,12 @@ async function runAdvisor() {
 
     var data   = await resp.json();
     var raw    = data.content[0].text;
-    var clean  = raw.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
-    var s = clean.indexOf('{'), e = clean.lastIndexOf('}') + 1;
-    var parsed = JSON.parse(clean.slice(s, e));
+    var parsed;
+    try {
+      parsed = extractJSON(raw);
+    } catch(parseErr) {
+      throw new Error('Could not parse file list: ' + parseErr.message);
+    }
 
     if (typing)  typing.classList.remove('show');
     if (status)  status.textContent = '— ' + (parsed.files||[]).length + ' files identified';
@@ -2036,6 +2036,50 @@ function uploadSingleFile(input, expectedName) {
     markAdvisorUploaded(file.name);
   };
   reader.readAsText(file);
+}
+
+
+// ── Robust JSON extractor — handles markdown fences, preamble, nested braces ──
+function extractJSON(raw) {
+  if (!raw) throw new Error('Empty response from AI');
+
+  // Strip markdown code fences
+  var clean = raw
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  // Find outermost valid JSON object using brace depth counting
+  var start = -1, depth = 0;
+  for (var i = 0; i < clean.length; i++) {
+    if (clean[i] === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (clean[i] === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        var candidate = clean.slice(start, i + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch(e) {
+          // Try to salvage by removing trailing commas (common AI mistake)
+          var salvaged = candidate
+            .replace(/,\s*}/g, '}')
+            .replace(/,\s*]/g, ']');
+          try {
+            return JSON.parse(salvaged);
+          } catch(e2) {
+            // Log raw for debugging and surface meaningful error
+            console.error('Raw AI response:', raw.slice(0, 500));
+            throw new Error('AI returned malformed JSON — try again or switch to Sonnet model');
+          }
+        }
+      }
+    }
+  }
+
+  console.error('Raw AI response:', raw.slice(0, 500));
+  throw new Error('No JSON object found in AI response — try again');
 }
 
 /* gate handled in <head> */
