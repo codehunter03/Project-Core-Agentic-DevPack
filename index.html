@@ -626,6 +626,7 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 }
 .advisor-typing.show{display:flex}
 
+
 /* ══════════════════════════════════════
    MOBILE / IPHONE RESPONSIVE STYLES
    ══════════════════════════════════════ */
@@ -835,7 +836,7 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
   <div class="hbadges">
     <span class="pill" style="color:#56d364;border-color:#238636;background:rgba(35,134,54,.1)">v1.0</span>
     <span class="pill" id="model-badge" style="color:#8b949e;border-color:#30363d;background:#161b22">claude-haiku-4-5</span>
-    <span class="pill" id="key-badge" style="color:#e3b341;border-color:#e3b341;background:rgba(227,179,65,.08)">⚠ No API Key</span>
+<span class="pill" id="key-badge" style="color:#e3b341;border-color:#e3b341;background:rgba(227,179,65,.08)">⚠ No API Key</span>
   </div>
 </header>
 
@@ -2152,6 +2153,185 @@ function extractJSON(raw) {
   console.error('Raw AI response:', raw.slice(0, 500));
   throw new Error('No JSON object found in AI response — try again');
 }
+
+
+// ══════════════════════════════════════════════════════
+//  SELF-TEST ENGINE — Silent background health check
+//  No UI impact. Results logged to browser console only.
+//  Open DevTools > Console to see results.
+// ══════════════════════════════════════════════════════
+
+var ST_BACKTRACE = [
+  'Program received signal SIGSEGV, Segmentation fault.',
+  '#0  process_data (buf=0x0, len=10) at processor.c:15',
+  '#1  0x000055555555516a in main () at processor.c:25'
+].join('\n');
+
+var ST_SOURCE = [
+  '#include <string.h>',
+  '#include <stdio.h>',
+  '',
+  'void process_data(char* buf, int len) {',
+  '    int bytes = strlen(buf);',
+  '    printf("Processing %d bytes\n", bytes);',
+  '}',
+  '',
+  'int main() {',
+  '    process_data(NULL, 10);',
+  '    return 0;',
+  '}'
+].join('\n');
+
+var stRunning = false;
+
+function stLog(check, status, detail) {
+  var icon = { pass:'✅', fail:'❌', skip:'⚪', info:'ℹ️' }[status] || '⚪';
+  var fn   = status === 'fail' ? console.error : console.log;
+  fn('[DevPack Self-Test] ' + icon + ' ' + check + (detail ? ' — ' + detail : ''));
+}
+
+async function runSelfTest() {
+  if (stRunning) return;
+  stRunning = true;
+
+  var apiKey = localStorage.getItem('devpack_api_key') || '';
+  var passed = 0, failed = 0;
+
+  console.group('[DevPack Self-Test] Running health checks...');
+
+  // ── CHECK 1: API Key ──────────────────────────────────────────────────
+  var keyOk = apiKey && apiKey.startsWith('sk-ant-');
+  stLog('① API Key', keyOk ? 'pass' : 'fail',
+    keyOk ? 'Present and format valid' : 'Missing or invalid');
+  if (keyOk) passed++; else { failed++; stLog('Remaining checks', 'skip', 'No API key'); console.groupEnd(); stRunning = false; return; }
+
+  // ── CHECK 2: API Connectivity ─────────────────────────────────────────
+  try {
+    var pingResp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 5,
+        messages: [{ role: 'user', content: 'ping' }]
+      })
+    });
+
+    if (pingResp.status === 200) {
+      stLog('② API Connectivity', 'pass', 'Anthropic API reachable');
+      passed++;
+    } else if (pingResp.status === 402) {
+      stLog('② API Connectivity', 'fail', 'No credits — add at console.anthropic.com/settings/billing');
+      failed++;
+      console.groupEnd(); stRunning = false; return;
+    } else if (pingResp.status === 401) {
+      stLog('② API Connectivity', 'fail', 'Invalid API key');
+      failed++;
+      console.groupEnd(); stRunning = false; return;
+    } else if (pingResp.status === 429) {
+      stLog('② API Connectivity', 'skip', 'Rate limited — skipping accuracy test');
+      console.groupEnd(); stRunning = false; return;
+    } else {
+      stLog('② API Connectivity', 'fail', 'HTTP ' + pingResp.status);
+      failed++;
+      console.groupEnd(); stRunning = false; return;
+    }
+  } catch(e) {
+    stLog('② API Connectivity', 'fail', 'Network error: ' + e.message);
+    failed++;
+    console.groupEnd(); stRunning = false; return;
+  }
+
+  // ── CHECK 3-6: Accuracy Test ──────────────────────────────────────────
+  stLog('③ Analysis Accuracy', 'info', 'Sending known null-ptr crash for analysis...');
+  try {
+    var accResp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 4096,
+        system: 'You are a crash analysis engine. Respond ONLY with valid JSON: {"root_cause":"...","bug_category":"...","severity":"...","confidence":"...","faulting_line":0,"faulting_function":"...","explanation":"...","fix_explanation":"...","fixed_code":"...","defensive_suggestions":[]}',
+        messages: [{
+          role: 'user',
+          content: ['Backtrace:', ST_BACKTRACE, '', 'Source:', '```c', ST_SOURCE, '```', 'Return JSON only.'].join('\n')
+        }]
+      })
+    });
+
+    if (!accResp.ok) throw new Error('HTTP ' + accResp.status);
+    var accData = await accResp.json();
+    var result  = extractJSON(accData.content[0].text);
+
+    // Bug category check
+    var catOk = result.bug_category && result.bug_category.toLowerCase().includes('null');
+    stLog('③ Analysis Accuracy', catOk ? 'pass' : 'fail',
+      'Bug category: ' + (result.bug_category || 'none'));
+    if (catOk) passed++; else failed++;
+
+    // JSON parse check
+    var jsonOk = result && Object.keys(result).length >= 5;
+    stLog('④ JSON Parsing', jsonOk ? 'pass' : 'fail',
+      jsonOk ? Object.keys(result).length + ' fields parsed' : 'Malformed JSON');
+    if (jsonOk) passed++; else failed++;
+
+    // Required fields
+    var required = ['root_cause','bug_category','explanation','fix_explanation','fixed_code'];
+    var missing  = required.filter(function(f){ return !result[f] || result[f].length < 5; });
+    stLog('⑤ Required Fields', missing.length === 0 ? 'pass' : 'fail',
+      missing.length === 0 ? 'All fields present' : 'Missing: ' + missing.join(', '));
+    if (!missing.length) passed++; else failed++;
+
+    // Fix code
+    var fixOk = result.fixed_code && result.fixed_code.length > 50;
+    stLog('⑥ Fix Generated', fixOk ? 'pass' : 'fail',
+      fixOk ? result.fixed_code.length + ' chars' : 'Missing or too short');
+    if (fixOk) passed++; else failed++;
+
+  } catch(e) {
+    stLog('③-⑥ Accuracy Tests', 'fail', 'Error: ' + e.message);
+    failed += 4;
+  }
+
+  // ── CHECK 7: UI Components ────────────────────────────────────────────
+  var required = ['bt','src','run-btn','result','r-exp','r-fix',
+                  'r-orig','r-diff','r-fixed','followup-section','chat-history'];
+  var missingUI = required.filter(function(id){ return !document.getElementById(id); });
+  stLog('⑦ UI Components', missingUI.length === 0 ? 'pass' : 'fail',
+    missingUI.length === 0
+      ? 'All ' + required.length + ' components present'
+      : 'Missing: ' + missingUI.map(function(id){ return '#'+id; }).join(', '));
+  if (!missingUI.length) passed++; else failed++;
+
+  // ── SUMMARY ───────────────────────────────────────────────────────────
+  var total = passed + failed;
+  if (failed === 0) {
+    console.log('[DevPack Self-Test] ✅ ALL ' + total + ' CHECKS PASSED — Tool is working correctly');
+  } else {
+    console.error('[DevPack Self-Test] ❌ ' + failed + '/' + total + ' CHECKS FAILED — Review above');
+  }
+
+  console.groupEnd();
+  stRunning = false;
+}
+
+// Auto-run silently on page load when API key already saved
+window.addEventListener('load', function() {
+  var apiKey = localStorage.getItem('devpack_api_key') || '';
+  if (apiKey && apiKey.startsWith('sk-ant-')) {
+    setTimeout(runSelfTest, 2000);
+  }
+});
 
 /* gate handled in <head> */
 </script>
