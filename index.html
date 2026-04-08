@@ -737,6 +737,10 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 
   // Check session immediately
   if (sessionStorage.getItem('devpack_ok') === '1') {
+    // Restore team token if session still active
+    if (!localStorage.getItem('devpack_team_token')) {
+      localStorage.setItem('devpack_team_token', 'DevPackTeam2024!');
+    }
     document.addEventListener('DOMContentLoaded', function() {
       var g = document.getElementById('gate');
       if (g) g.className = 'hidden';
@@ -771,6 +775,7 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 
     if (plainOk || hashOk) {
       sessionStorage.setItem('devpack_ok', '1');
+      localStorage.setItem('devpack_team_token', 'DevPackTeam2024!');
       var gate = document.getElementById('gate');
       if (gate) gate.className = 'hidden';
       if (err)  err.textContent = '';
