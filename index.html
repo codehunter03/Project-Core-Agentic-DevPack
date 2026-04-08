@@ -1501,11 +1501,12 @@ async function runAnalysis() {
   document.getElementById('run-btn').disabled=true;
   document.getElementById('prog').style.display='flex';
   curOrig=src;
+  var analysisStart = Date.now();
 
   try {
-    lg('Parsing crash signal and backtrace...'); setStep(0); await sleep(300);
-    lg('Mapping crash location to source file...'); setStep(1); await sleep(300);
-    lg('Sending to Claude AI for root cause analysis...'); setStep(2);
+    lg('Parsing crash signal and backtrace...'); setStep(0); await sleep(200);
+    lg('Mapping crash location to source file...'); setStep(1); await sleep(200);
+    lg('Sending to AI for root cause analysis (15-30s)...'); setStep(2);
 
     // ── Pre-process backtrace to extract key signals ──
     const btLines = bt.split('\n');
@@ -1564,7 +1565,8 @@ async function runAnalysis() {
     curResult={...parsed,originalSource:src,fileName:curFname};
 
     lg('Generating diff...'); await sleep(200); setStep(4);
-    lg('✅ Analysis complete!','ok');
+    var elapsed = Math.round((Date.now() - analysisStart) / 1000);
+    lg('✅ Analysis complete in ' + elapsed + 's!','ok');
     renderResult(curResult);
 
   } catch(err) {
@@ -2177,9 +2179,20 @@ async function runSelfTest() {
 window.addEventListener('load', function() {
   var apiKey = localStorage.getItem('devpack_api_key') || '';
   if (apiKey && apiKey.startsWith('sk-ant-')) {
-    setTimeout(runSelfTest, 2000);
+    // Warm up Lambda immediately to eliminate cold start delay
+    setTimeout(warmLambda, 500);
+    // Self-test runs after warm-up
+    setTimeout(runSelfTest, 3000);
   }
 });
+
+// Keep Lambda warm — ping every 4 minutes (Lambda sleeps after 5 min)
+function warmLambda() {
+  fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/warm', {
+    method: 'GET',
+  }).catch(function() {}); // silent — ignore errors
+}
+setInterval(warmLambda, 4 * 60 * 1000);
 
 /* gate handled in <head> */
 </script>
