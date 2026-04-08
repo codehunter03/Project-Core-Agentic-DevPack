@@ -1853,6 +1853,8 @@ async function runAdvisor() {
 
   if (!bt || bt.length < 20) return;
   if (!apiKey || !apiKey.startsWith('sk-ant-')) return;
+  var teamToken = localStorage.getItem('devpack_team_token') || '';
+  if (!teamToken) return; // Not logged in yet
 
   // Show scanning state
   if (panel)   panel.style.display = 'flex';
@@ -1862,15 +1864,13 @@ async function runAdvisor() {
   if (status)  status.textContent = '— scanning...';
   if (rerunBtn) rerunBtn.style.display = 'none';
 
-  var prompt = 'Analyze this GDB backtrace and identify all source files needed:\n\n```\n' + bt + '\n```';
-
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/advisor', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
-        'X-Team-Token': localStorage.getItem('devpack_team_token') || '',
+        'X-Team-Token': teamToken,
       },
       body: JSON.stringify({ backtrace: bt })
     });
@@ -1904,8 +1904,15 @@ async function runAdvisor() {
 
   } catch(err) {
     if (typing) typing.classList.remove('show');
-    if (status) status.textContent = '';
-    list.innerHTML = '<div style="color:var(--red);font-size:.72rem">❌ Scan failed: ' + err.message + '</div>';
+    if (status) status.textContent = '— scan failed';
+    var errMsg = err.message || 'Unknown error';
+    var errHint = '';
+    if (errMsg.includes('401') || errMsg.includes('Invalid team')) errHint = ' — Check your API key and password';
+    else if (errMsg.includes('402') || errMsg.includes('credit'))  errHint = ' — Add API credits at console.anthropic.com';
+    else if (errMsg.includes('429')) errHint = ' — Rate limited, wait 30s and try again';
+    else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) errHint = ' — Check internet connection';
+    list.innerHTML = '<div style="color:var(--red);font-size:.72rem;padding:.5rem">❌ File scan failed: ' + errMsg + errHint + '</div>';
+    if (rerunBtn) rerunBtn.style.display = 'inline-block';
   } finally {
     // nothing to re-enable — no button to manage
   }
