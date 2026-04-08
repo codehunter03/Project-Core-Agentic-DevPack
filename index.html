@@ -1762,12 +1762,20 @@ document.getElementById('bt').addEventListener('input', function() {
 
   // Debounce: wait 1s after user stops typing/pasting
   advisorDebounce = setTimeout(function() {
-    var apiKey = localStorage.getItem('devpack_api_key') || '';
+    var apiKey    = localStorage.getItem('devpack_api_key') || '';
+    var teamToken = localStorage.getItem('devpack_team_token') || '';
+
     if (!apiKey || !apiKey.startsWith('sk-ant-')) {
-      // No API key yet — show a gentle nudge instead of error
       if (typing) typing.classList.remove('show');
       if (status) status.textContent = '';
       if (list) list.innerHTML = '<div style="color:var(--t3);font-size:.72rem">💡 Save your API key above to auto-scan required files.</div>';
+      return;
+    }
+    if (!teamToken) {
+      // Not logged in yet — silently wait
+      if (typing) typing.classList.remove('show');
+      if (status) status.textContent = '';
+      if (list) list.innerHTML = '<div style="color:var(--t3);font-size:.72rem">💡 Log in first, then paste your backtrace.</div>';
       return;
     }
     runAdvisor();
