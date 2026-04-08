@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agentic DevPack — Core Dump Analyzer</title>
+<title>CoreDumpAnalyzer — Core Dump Analyzer & Auto-Fix Engine</title>
+<meta name="description" content="AI-powered core dump analyzer and auto-fix engine. Diagnose crashes, identify root causes and generate fixes instantly.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%230d1117'/><text y='50' x='8' font-size='38' font-family='monospace' fill='%2358a6ff' font-weight='bold'>&gt;_</text><text y='85' x='8' font-size='22' font-family='monospace' fill='%2356d364'>CD</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400&family=Syne:wght@400;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -813,8 +815,11 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 <div id="gate">
   <div class="gate-box">
     <div class="gate-gem">🔬</div>
-    <div class="gate-title">Agentic DevPack</div>
-    <div class="gate-sub">Enter your team access password<br>to continue</div>
+    <div class="gate-title">CoreDumpAnalyzer</div>
+    <div class="gate-sub" style="font-size:.68rem;color:var(--t2);margin-bottom:1.5rem;line-height:1.7">
+      Core Dump Analyzer &amp; Auto-Fix Engine<br>
+      Enter your team access password to continue
+    </div>
     <div class="gate-wrap">
       <input type="password" id="gate-inp" placeholder="••••••••••"
         autocomplete="off" onkeydown="if(event.key==='Enter')unlock()">
@@ -824,7 +829,10 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
     <button id="gate-btn" onclick="unlock()">🔓 Unlock DevPack</button>
     <div class="gate-foot">
       🔐 Access restricted to authorized team members only<br>
-      Contact your admin if you need access
+      Contact your admin if you need access<br><br>
+      <span style="color:var(--t3);font-size:.58rem">
+        Developed by Devendra Pillay &copy; 2026
+      </span>
     </div>
   </div>
 </div>
@@ -832,9 +840,9 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 <!-- ══ HEADER ══ -->
 <header>
   <div class="logo">
-    <div class="logo-gem">🔬</div>
+    <div class="logo-gem" style="font-family:monospace;font-size:.7rem;font-weight:900;letter-spacing:-.5px;color:#58a6ff;background:linear-gradient(135deg,#0d1117,#161b22);border:1px solid #30363d;">CD</div>
     <div>
-      <div class="logo-name">Agentic DevPack</div>
+      <div class="logo-name">CoreDumpAnalyzer</div>
       <div class="logo-tag">Core Dump Analyzer &amp; Auto-Fix Engine</div>
     </div>
   </div>
@@ -927,7 +935,7 @@ void causeCrash() {
     <div id="err-box"></div>
 
     <!-- Run button -->
-    <button id="run-btn" onclick="runAnalysis()">⚡ Run DevPack Analysis</button>
+    <button id="run-btn" onclick="runAnalysis()">🔍 Investigate Crash</button>
 
     <!-- Progress -->
     <div class="prog-wrap" id="prog">
@@ -958,13 +966,13 @@ void causeCrash() {
     <!-- Empty state -->
     <div class="empty" id="empty">
       <div class="empty-glyph">🔬</div>
-      <div class="empty-h">Ready to Analyze</div>
+      <div class="empty-h">Ready to Analyze Core Dumps</div>
       <div class="empty-steps">
         <div>① Enter your Anthropic API key above</div>
         <div>② Paste your GDB backtrace</div>
         <div>③ File advisor auto-scans in 1 second</div>
         <div>④ Upload the suggested files</div>
-        <div>⑤ Click <code>⚡ Run DevPack Analysis</code></div>
+        <div>⑤ Click <code>🔍 Investigate Crash</code></div>
       </div>
       <div style="font-size:.62rem;color:var(--t3)">C · C++ · Python · Go · Rust · Java · JS · TS</div>
     </div>
@@ -1074,6 +1082,16 @@ void causeCrash() {
     </div><!-- /#result -->
   </div><!-- /.rpanel -->
 </div><!-- /.workspace -->
+<div style="
+  text-align:center;padding:.6rem;
+  border-top:1px solid var(--s4);
+  font-size:.6rem;color:var(--t3);
+  background:var(--s1);
+  letter-spacing:.5px;
+">
+  CoreDumpAnalyzer &mdash; Core Dump Analyzer &amp; Auto-Fix Engine &nbsp;&bull;&nbsp;
+  Developed by <strong style="color:var(--t2)">Devendra Pillay</strong> &copy; 2026
+</div>
 
 <script>
 // ══════════════════════════════════════════════

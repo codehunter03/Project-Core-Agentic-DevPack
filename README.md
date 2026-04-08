@@ -1,180 +1,170 @@
-# Agentic DevPack
+# CoreDumpAnalyzer
 **Core Dump Analyzer & Auto-Fix Engine — powered by Claude AI**
 
-Live URL: `https://codehunter03.github.io/Project-Core-Agentic-DevPack/`
+> AI-powered tool that analyzes GDB core dumps, identifies root causes, and generates complete fixes automatically.
+
+**Live:** https://coredumpanalyzer.com
 
 ---
 
-## What It Does
+## 🔐 Team Access
 
-Paste a GDB backtrace and the crashing source file — DevPack uses Claude AI to:
-
-- Identify the **exact root cause** (not just the signal)
-- Highlight the **faulting line** in your source
-- Generate a **complete fixed source file**
-- Show a **unified diff** of every change
-- Give **defensive coding suggestions** to prevent recurrence
-- Let you **follow up in chat** if the fix doesn't fully resolve the crash
-
-Supports: C · C++ · Python · Go · Rust · Java · JavaScript · TypeScript
-
-Bug classes: Null Pointer Dereference · Buffer Overflow · Use-After-Free · Race Condition · Integer Overflow · Stack Corruption · Memory Leak · Double Free · Format String · Logic Error
-
----
-
-## Accessing the Tool
-
-The tool is protected by a password gate.
-
-Contact your admin for the team password. After unlocking, each user must enter their own Anthropic API key — the tool does not work without one.
-
-> **Note:** The password gate is a friction layer, not a security boundary. The tool's real access control is the requirement for a valid personal Anthropic API key.
-
----
-
-## First-Time Setup (for each team member)
-
-1. Open the live URL above
-2. Enter the team password → click **Unlock DevPack**
-3. Get an Anthropic API key at [console.anthropic.com](https://console.anthropic.com)
-4. Paste your key into the **Your Anthropic API Key** banner at the top
-5. Click **Save Key** — then click **⚡ Test Key** to confirm it works
-6. You're ready to analyze crashes
-
-Your key is stored only in your browser's `localStorage`. It is never sent anywhere except directly to Anthropic's API.
-
----
-
-## Running an Analysis
-
-1. Paste your GDB backtrace into the **GDB Backtrace / Core Output** field
-
-   ```bash
-   # Generate a backtrace with GDB
-   gdb ./binary ./core -ex "bt full" -ex "info locals" -ex "quit"
-   ```
-
-2. Paste or upload your crashing source file (use **Upload** for files up to ~40 KB)
-3. Select a model:
-   - **Haiku 4.5** — fastest, cheapest (~$0.01/analysis) — good for most crashes
-   - **Sonnet 4.5** — more thorough (~$0.04/analysis) — use for complex multi-frame bugs
-4. Click **⚡ Run DevPack Analysis**
-5. Review results across four tabs: **Analysis · Diff · Fixed File · Suggestions**
-6. Download the fixed file with **⬇ Download Fixed File**
-7. If the fix doesn't fully resolve the crash, describe what happened in the **Follow-up** chat at the bottom
-
----
-
-## Source File Size Limits
-
-| Size | Status |
-|------|--------|
-| < 15 KB | OK — no warning |
-| 15–40 KB | Warning shown — may approach token limit |
-| > 40 KB | Blocked — analysis will not run |
-
-If your file is too large, paste only the relevant section: the crashing function and its immediate callers. The backtrace tells you exactly which functions to include.
-
----
-
-## API Key Management
-
-| Button | What it does |
-|--------|-------------|
-| **Save Key** | Validates format and stores key in browser localStorage |
-| **⚡ Test Key** | Makes a live ping to Anthropic to confirm the key works |
-| **🗑 Clear Key** | Removes the key from this browser (with confirmation prompt) |
-
-**Validation rules on Save:**
-- Must start with `sk-ant-`
-- Must be at least 40 characters
-- Must contain no spaces (catches truncated copy-pastes)
-
----
-
-## Rate Limiting
-
-If Anthropic rate-limits a request (HTTP 429), the tool automatically retries up to **3 times** using the `retry-after` interval from Anthropic's response. A live countdown is shown in the progress log. No action needed from the user.
-
----
-
-## Cost
-
-Each team member uses their own API key and is billed directly by Anthropic.
-
-| Model | Cost per analysis | $5 budget |
-|-------|-------------------|-----------|
-| Haiku 4.5 | ~$0.01 | ~500 analyses |
-| Sonnet 4.5 | ~$0.04 | ~125 analyses |
-
-Follow-up chat messages cost less than a full analysis (smaller prompts, 2 048 token cap).
-
----
-
-## Privacy
-
-Your backtrace and source code are sent directly to Anthropic's API for analysis.
-
-- **Do not paste** proprietary, classified, or NDA-protected code
-- For sensitive codebases, paste only the relevant few functions and anonymise variable/function names
-- Anthropic's [Privacy Policy](https://www.anthropic.com/legal/privacy) applies to all data sent via the API
-
----
-
-## Changing the Password
-
-### Step 1 — Generate a new SHA-256 hash
-
-```bash
-echo -n "YourNewPassword" | sha256sum
+```
+URL      : https://coredumpanalyzer.com
+Password : DevPack@2024
+API Key  : Each person gets their own at console.anthropic.com (~$5 credits)
+Cost     : ~$0.01 per crash analysis
 ```
 
-Or use an online tool: [emn178.github.io/online-tools/sha256.html](https://emn178.github.io/online-tools/sha256.html)
+---
 
-### Step 2 — Update index.html
+## 🔑 How to Change the Password
 
-Find this line (near the top of the `<head>` script block):
+**Step 1** — Generate a SHA-256 hash of your new password:
+```
+https://emn178.github.io/online-tools/sha256.html
+```
 
+**Step 2** — In `index.html` find:
 ```javascript
 var HASH = 'e34f5cbf233f274b8602ae750a3ea9a83a0e397b31cf2b9ae911b863a1557cf9';
 ```
+Replace with your new hash.
 
-Replace the hash string with your new one. Keep the quotes. Do **not** add a `PASS =` variable — the plaintext password must never appear in source.
-
-### Step 3 — Deploy
-
-```bash
-git add index.html
-git commit -m "chore: rotate access password"
-git push
+**Step 3** — Also update Lambda environment variable:
+```
+AWS Console → Lambda → devpack-api → Configuration → Environment variables
+TEAM_TOKEN → your-new-token
 ```
 
-GitHub Pages updates in ~60 seconds. The old password stops working immediately.
+**Step 4** — Deploy:
+```bash
+git add index.html
+git commit -m "chore: update access password"
+git push --force
+```
 
 ---
 
-## Security Notes
+## 🏗 Architecture
 
-| What | Where it lives |
-|------|----------------|
-| Team password | SHA-256 hash only — plaintext never in source |
-| API keys | Each user's browser `localStorage` — never on any server |
-| Source code & backtraces | Sent only to Anthropic's API per their Privacy Policy |
-| Nothing | Sent to any intermediate server |
-
-The password gate is client-side only. A determined person who can view the page source can bypass it. The meaningful access control is the personal API key requirement.
+```
+coredumpanalyzer.com          AWS Lambda (hidden)
+(GitHub Pages — public)       api via API Gateway
+      ↓                              ↓
+  HTML form only              - System prompts
+  No secrets                  - Business logic
+  No prompts                  - Team validation
+  No logic                    - Anthropic routing
+```
 
 ---
 
-## Deployment
+## 🚀 How Your Team Uses It
 
-The tool is a single static HTML file deployed via GitHub Pages.
+1. Open `https://coredumpanalyzer.com`
+2. Enter team password
+3. Enter your Anthropic API key → Save Key → Test Key
+4. Paste GDB backtrace — file advisor auto-scans in 1 second
+5. Upload suggested source files
+6. Click **🔬 Analyze Core Dump**
+7. Get root cause + fixed file + diff + suggestions
+8. Use follow-up chat if first fix doesn't fully resolve it
+
+---
+
+## 🐛 Supported Bug Types
+
+Null Pointer Dereference · Buffer Overflow · Use-After-Free ·
+Race Condition · Integer Overflow · Stack Corruption ·
+Memory Leak · Double Free · Format String · Logic Error
+
+## 📝 Supported Languages
+
+C · C++ · Python · Go · Rust · Java · JavaScript · TypeScript
+
+---
+
+## 🛠 CLI Tool (Advanced)
 
 ```bash
-# No build step needed — edit index.html and push
-git add index.html
-git commit -m "your message"
-git push
+cd agentic-devpack
+export ANTHROPIC_API_KEY="sk-ant-..."
+pip install -r requirements.txt
+
+# With actual core dump
+python main.py \
+  --core ./core.12345 \
+  --binary ./myapp \
+  --source ./src/handler.cpp
+
+# With pasted GDB output
+python main.py \
+  --backtrace ./bt.txt \
+  --source ./src/handler.cpp
 ```
 
-GitHub Actions (`.github/workflows/deploy.yml`) handles the Pages deployment automatically on every push to `main`.
+---
+
+## ☁️ AWS Lambda Backend
+
+| Resource | Details |
+|---|---|
+| Function | `devpack-api` |
+| Region | `us-east-1` |
+| Runtime | `Node.js 20.x` |
+| Timeout | `3 minutes` |
+| Memory | `256 MB` |
+| API Gateway | `sympib3n8l.execute-api.us-east-1.amazonaws.com` |
+
+### Lambda Environment Variables
+| Key | Value |
+|---|---|
+| `TEAM_TOKEN` | `DevPackTeam2024!` |
+
+### Lambda Routes
+| Route | Method | Purpose |
+|---|---|---|
+| `/health` | GET | Health check + warm ping |
+| `/warm` | GET | Keep-alive ping |
+| `/analyze` | POST | Full crash analysis |
+| `/advisor` | POST | File requirements scan |
+| `/chat` | POST | Follow-up iterative fix |
+
+---
+
+## 💰 Cost Breakdown
+
+| Service | Free Tier | Monthly Cost |
+|---|---|---|
+| GitHub Pages | Free | $0 |
+| AWS Lambda | 1M requests free forever | $0 |
+| AWS API Gateway | 1M/month free (12 months) | ~$0.005 after |
+| GoDaddy Domain | — | ~$1/month |
+| Anthropic API | Pay per use | ~$0.01/analysis |
+
+---
+
+## 🔒 Security
+
+- Team password: SHA-256 hashed — never plain text in source
+- Anthropic API keys: each user's browser localStorage only
+- System prompts: in Lambda — never visible in browser source
+- Source code sent to Anthropic API only — not stored anywhere
+
+---
+
+## 🔄 Deploying Updates
+
+```bash
+# Frontend
+git add index.html
+git commit -m "your change"
+git push --force
+
+# Lambda — paste new index.mjs in AWS Console → Deploy
+```
+
+---
+
+*Developed by Devendra Pillay © 2026*
