@@ -1491,11 +1491,12 @@ async function runAnalysis() {
 
   // Warn if source file is very large
   var srcLines = src.split('\n').length;
-  if (srcLines > 800) {
+  var srcChars = src.length;
+  if (srcChars > 20000) {
     var proceed = confirm(
-      'Your source file has ' + srcLines + ' lines.\n\n' +
-      'Very large files may exceed the AI token limit and produce incomplete results.\n\n' +
-      'Tip: paste only the file containing the crash (not the whole project).\n\n' +
+      'Your source file is large (' + srcLines + ' lines, ' + Math.round(srcChars/1000) + 'KB).\n\n' +
+      'Files over 20KB may exceed the AI token limit causing incomplete JSON responses.\n\n' +
+      'Tip: paste only the function/section containing the crash.\n\n' +
       'Continue anyway?'
     );
     if (!proceed) return;
@@ -1555,16 +1556,33 @@ async function runAnalysis() {
       throw new Error(err.error?.message||`HTTP ${resp.status}`);
     }
 
-    const data=await resp.json();
-    if(!resp.ok) throw new Error(data.error || 'Server error: ' + resp.status);
-    const raw=data.result;
+    var respData;
+    try {
+      respData = await resp.json();
+    } catch(e) {
+      throw new Error('Server returned invalid response — check Lambda logs');
+    }
+    if(!resp.ok) throw new Error(respData.error || 'Server error: ' + resp.status);
+
+    const raw = respData.result;
     lg('Parsing AI response...'); setStep(3); await sleep(200);
+
+    // Log raw for debugging (first 200 chars)
+    if (!raw) {
+      console.error('Empty result from Lambda. Full response:', JSON.stringify(respData));
+      throw new Error('Empty response from server — Lambda may have timed out');
+    }
+    if (!raw.includes('{')) {
+      console.error('Non-JSON response (first 300 chars):', raw.slice(0,300));
+      throw new Error('AI returned plain text instead of JSON — try again or check Lambda timeout setting');
+    }
 
     var parsed;
     try {
       parsed = extractJSON(raw);
     } catch(parseErr) {
-      lg('⚠️ ' + parseErr.message, 'err');
+      console.error('Parse failed. Raw response (first 500 chars):', raw.slice(0,500));
+      lg('⚠️ ' + parseErr.message + ' — check browser console for details', 'err');
       throw parseErr;
     }
     curResult={...parsed,originalSource:src,fileName:curFname};
