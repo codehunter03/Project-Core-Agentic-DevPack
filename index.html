@@ -1569,60 +1569,71 @@ async function runAnalysis() {
 
     // Prompt built server-side
 
-    const resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze', {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'X-Api-Key':     apiKey,
-        'X-Team-Token':  localStorage.getItem('devpack_team_token') || '',
-      },
-      body: JSON.stringify({
-        backtrace:       bt,
-        source:          src,
-        filename:        curFname,
-        additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
-      }),
-    });
+    // ── Auto-retry up to 3 times on JSON parse failure ──────────────────
+    var parsed = null;
+    var lastRaw = '';
+    var maxRetries = 3;
 
-    if(!resp.ok){
-      const err=await resp.json().catch(()=>({error:{message:resp.statusText}}));
-      throw new Error(err.error?.message||`HTTP ${resp.status}`);
+    for (var attempt = 1; attempt <= maxRetries; attempt++) {
+      if (attempt > 1) {
+        lg('⚠️ JSON parse failed — auto-retrying (' + attempt + '/' + maxRetries + ')...', 'info');
+        await sleep(1500);
+      }
+
+      var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'X-Api-Key':     apiKey,
+          'X-Team-Token':  localStorage.getItem('devpack_team_token') || '',
+        },
+        body: JSON.stringify({
+          backtrace:       bt,
+          source:          src,
+          filename:        curFname,
+          additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
+          strict_json:     attempt > 1,  // Signal Lambda to be stricter on retry
+        }),
+      });
+
+      if (!resp.ok) {
+        var errData = await resp.json().catch(function(){ return {}; });
+        throw new Error(errData.error || 'HTTP ' + resp.status);
+      }
+
+      var respData;
+      try { respData = await resp.json(); }
+      catch(e) { throw new Error('Server returned invalid response'); }
+
+      var raw = respData.result || '';
+      lastRaw = raw;
+
+      if (!raw || !raw.includes('{')) {
+        console.error('Attempt ' + attempt + ' — non-JSON response:', raw.slice(0,200));
+        if (attempt === maxRetries) {
+          throw new Error('AI returned invalid response after ' + maxRetries + ' attempts — try with a smaller source file');
+        }
+        continue; // retry
+      }
+
+      try {
+        parsed = extractJSON(raw);
+        break; // success — exit retry loop
+      } catch(parseErr) {
+        console.error('Attempt ' + attempt + ' — parse failed:', raw.slice(0,300));
+        if (attempt === maxRetries) {
+          throw new Error('Could not parse AI response after ' + maxRetries + ' attempts — ' + parseErr.message);
+        }
+        // continue to retry
+      }
     }
 
-    var respData;
-    try {
-      respData = await resp.json();
-    } catch(e) {
-      throw new Error('Server returned invalid response — check Lambda logs');
-    }
-    if(!resp.ok) throw new Error(respData.error || 'Server error: ' + resp.status);
-
-    const raw = respData.result;
     lg('Parsing AI response...'); setStep(3); await sleep(200);
-
-    // Log raw for debugging (first 200 chars)
-    if (!raw) {
-      console.error('Empty result from Lambda. Full response:', JSON.stringify(respData));
-      throw new Error('Empty response from server — Lambda may have timed out');
-    }
-    if (!raw.includes('{')) {
-      console.error('Non-JSON response (first 300 chars):', raw.slice(0,300));
-      throw new Error('AI returned plain text instead of JSON — try again or check Lambda timeout setting');
-    }
-
-    var parsed;
-    try {
-      parsed = extractJSON(raw);
-    } catch(parseErr) {
-      console.error('Parse failed. Raw response (first 500 chars):', raw.slice(0,500));
-      lg('⚠️ ' + parseErr.message + ' — check browser console for details', 'err');
-      throw parseErr;
-    }
-    curResult={...parsed,originalSource:src,fileName:curFname};
+    curResult = Object.assign({}, parsed, { originalSource: src, fileName: curFname });
 
     lg('Generating diff...'); await sleep(200); setStep(4);
     var elapsed = Math.round((Date.now() - analysisStart) / 1000);
-    lg('✅ Analysis complete in ' + elapsed + 's!','ok');
+    lg('✅ Analysis complete in ' + elapsed + 's!', 'ok');
     renderResult(curResult);
 
   } catch(err) {
