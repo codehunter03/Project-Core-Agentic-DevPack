@@ -1052,6 +1052,17 @@ void causeCrash() {
         <div class="code-box" id="r-fixed"></div>
       </div>
 
+      <!-- RCA Document pane -->
+      <div class="tpane" id="tp-rca">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="slbl" style="margin:0">📄 RCA Document — Ready to attach to JIRA</div>
+          <button class="dl-btn" onclick="downloadRCA('pdf')" style="background:var(--red2);padding:6px 18px;font-size:.75rem">
+            📄 Download PDF
+          </button>
+        </div>
+        <div id="rca-preview" style="background:#fff;border-radius:6px;overflow:auto;max-height:500px;"></div>
+      </div>
+
       <!-- Suggestions pane -->
       <div class="tpane" id="tp-tips">
         <div class="slbl">Defensive Coding Suggestions</div>
@@ -1483,8 +1494,11 @@ function renderResult(r) {
   document.querySelectorAll('.tab')[0].classList.add('on');
   // Show follow-up chat, reset history for new analysis
   chatHistory = []; chatIteration = 0;
+  rcaRendered = false;
   var ch = document.getElementById('chat-history');
   if (ch) ch.innerHTML = '';
+  var rcaPrev = document.getElementById('rca-preview');
+  if (rcaPrev) rcaPrev.innerHTML = '';
   showFollowupSection();
 }
 
@@ -2242,6 +2256,207 @@ function warmLambda() {
   }).catch(function() {}); // silent — ignore errors
 }
 setInterval(warmLambda, 4 * 60 * 1000);
+
+
+// ══════════════════════════════════════════════════════
+//  RCA DOCUMENT GENERATOR
+//  Generates professional Root Cause Analysis document
+//  for JIRA ticket attachment
+// ══════════════════════════════════════════════════════
+
+var rcaRendered = false;
+
+function escRCA(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function renderRCA() {
+  if (!curResult) return;
+
+  var r        = curResult;
+  var now      = new Date();
+  var dateStr  = now.toLocaleDateString('en-GB', {day:'2-digit',month:'long',year:'numeric'});
+  var timeStr  = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+  var filename = r.fileName || curFname || 'unknown';
+
+  // Severity color
+  var sevColor = {
+    Critical: '#dc2626', High: '#ea580c',
+    Medium: '#ca8a04',   Low:  '#16a34a'
+  }[r.severity] || '#6b7280';
+
+  // Build chat history section
+  var chatSection = '';
+  if (chatHistory && chatHistory.length > 0) {
+    chatSection = '<h2 style="color:#1e3a5f;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-top:24px">Fix Iteration History</h2>';
+    var msgNum = 0;
+    chatHistory.forEach(function(msg) {
+      if (msg.role === 'user') {
+        msgNum++;
+        chatSection += '<div style="margin:12px 0;padding:10px 14px;background:#f0f9ff;border-left:3px solid #3b82f6;border-radius:4px">';
+        chatSection += '<div style="font-size:10px;color:#6b7280;margin-bottom:4px;font-weight:600">ITERATION ' + msgNum + ' — Developer Report</div>';
+        chatSection += '<div style="font-size:12px;color:#1f2937">' + escRCA(msg.content) + '</div>';
+        chatSection += '</div>';
+      } else if (msg.role === 'assistant' && msgNum > 0) {
+        chatSection += '<div style="margin:6px 0 12px 0;padding:10px 14px;background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px">';
+        chatSection += '<div style="font-size:10px;color:#6b7280;margin-bottom:4px;font-weight:600">AI RESPONSE — Updated Fix</div>';
+        chatSection += '<div style="font-size:12px;color:#1f2937">' + escRCA(msg.content) + '</div>';
+        chatSection += '</div>';
+      }
+    });
+  }
+
+  // Build defensive suggestions
+  var sugSection = '';
+  (r.defensive_suggestions || []).forEach(function(s, i) {
+    sugSection += '<li style="margin:6px 0;font-size:12px;color:#374151">' + escRCA(s) + '</li>';
+  });
+
+  // Build diff summary
+  var diffSummary = r.patch_summary || r.patch_hunks || 'See fixed source file for complete changes.';
+
+  // Buggy vs Fixed code snippets
+  var codeSection = '';
+  if (r.code_fix && r.code_fix.buggy_snippet && r.code_fix.buggy_snippet.length > 0) {
+    codeSection = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">';
+
+    codeSection += '<div><div style="font-size:10px;font-weight:700;color:#dc2626;margin-bottom:4px">❌ PROBLEMATIC CODE</div>';
+    codeSection += '<pre style="background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:10px;font-size:11px;overflow:auto;margin:0">';
+    r.code_fix.buggy_snippet.forEach(function(item) {
+      codeSection += 'Line ' + item.line + ': ' + escRCA(item.code) + '\n';
+      if (item.annotation) codeSection += '// ↑ ' + escRCA(item.annotation) + '\n';
+    });
+    codeSection += '</pre></div>';
+
+    codeSection += '<div><div style="font-size:10px;font-weight:700;color:#16a34a;margin-bottom:4px">✅ FIXED CODE</div>';
+    codeSection += '<pre style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:10px;font-size:11px;overflow:auto;margin:0">';
+    r.code_fix.fixed_snippet.forEach(function(item) {
+      codeSection += 'Line ' + item.line + ': ' + escRCA(item.code) + '\n';
+      if (item.annotation) codeSection += '// ↑ ' + escRCA(item.annotation) + '\n';
+    });
+    codeSection += '</pre></div>';
+    codeSection += '</div>';
+  }
+
+  var html = `
+<div id="rca-doc" style="font-family:Arial,sans-serif;color:#111827;padding:32px;max-width:800px;margin:0 auto;background:#fff">
+
+  <!-- Header -->
+  <div style="border-bottom:3px solid #1e3a5f;padding-bottom:16px;margin-bottom:24px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div style="font-size:10px;color:#6b7280;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Root Cause Analysis Report</div>
+        <h1 style="font-size:22px;color:#1e3a5f;margin:0;font-weight:700">CoreDumpAnalyzer RCA</h1>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px">Core Dump Analyzer &amp; Auto-Fix Engine</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#6b7280">Generated: ${dateStr} at ${timeStr}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:2px">Source File: <strong>${escRCA(filename)}</strong></div>
+        <div style="margin-top:8px;display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;background:${sevColor}">${r.severity || 'High'} Severity</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Executive Summary -->
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin-bottom:20px">
+    <h2 style="font-size:13px;color:#1e3a5f;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:1px">Executive Summary</h2>
+    <div style="font-size:13px;color:#1f2937;line-height:1.6">${escRCA(r.root_cause)}</div>
+  </div>
+
+  <!-- Metadata Table -->
+  <h2 style="color:#1e3a5f;border-bottom:2px solid #e5e7eb;padding-bottom:6px;font-size:14px">Incident Details</h2>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:12px">
+    <tr style="background:#f8fafc">
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:600;color:#374151;width:30%">Bug Category</td>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;color:#1f2937">${escRCA(r.bug_category)}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:600;color:#374151">Severity</td>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb"><span style="color:${sevColor};font-weight:700">${r.severity}</span></td>
+    </tr>
+    <tr style="background:#f8fafc">
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:600;color:#374151">Confidence</td>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb">${r.confidence || 'High'}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:600;color:#374151">Faulting Function</td>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;font-family:monospace">${escRCA(r.faulting_function)}() at line ${r.faulting_line || '?'}</td>
+    </tr>
+    <tr style="background:#f8fafc">
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:600;color:#374151">Source File</td>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;font-family:monospace">${escRCA(filename)}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:600;color:#374151">Analysis Date</td>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb">${dateStr} ${timeStr}</td>
+    </tr>
+    <tr style="background:#f8fafc">
+      <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:600;color:#374151">Tool</td>
+      <td style="padding:8px 12px;border:1px solid #e5e7eb">CoreDumpAnalyzer — coredumpanalyzer.com</td>
+    </tr>
+  </table>
+
+  <!-- Root Cause Analysis -->
+  <h2 style="color:#1e3a5f;border-bottom:2px solid #e5e7eb;padding-bottom:6px;font-size:14px">Root Cause Analysis</h2>
+  <div style="font-size:12px;color:#374151;line-height:1.8;margin-bottom:20px">${escRCA(r.explanation)}</div>
+
+  <!-- Code Fix -->
+  <h2 style="color:#1e3a5f;border-bottom:2px solid #e5e7eb;padding-bottom:6px;font-size:14px">Code Changes</h2>
+  ${codeSection || '<p style="font-size:12px;color:#6b7280">See fixed source file for complete changes.</p>'}
+
+  <!-- Fix Explanation -->
+  <h2 style="color:#1e3a5f;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-top:20px;font-size:14px">Fix Explanation</h2>
+  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:14px;margin-bottom:20px">
+    <div style="font-size:12px;color:#166534;line-height:1.7">${escRCA(r.fix_explanation)}</div>
+  </div>
+
+  <!-- Patch Summary -->
+  <h2 style="color:#1e3a5f;border-bottom:2px solid #e5e7eb;padding-bottom:6px;font-size:14px">Patch Summary</h2>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:12px;margin-bottom:20px;font-family:monospace;font-size:11px;color:#374151;white-space:pre-wrap">${escRCA(diffSummary)}</div>
+
+  <!-- Fix History -->
+  ${chatSection}
+
+  <!-- Defensive Recommendations -->
+  <h2 style="color:#1e3a5f;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-top:24px;font-size:14px">Defensive Recommendations</h2>
+  <ul style="margin:0;padding-left:20px">${sugSection || '<li style="font-size:12px;color:#6b7280">No additional recommendations.</li>'}</ul>
+
+  <!-- Footer -->
+  <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-size:10px;color:#9ca3af">Generated by CoreDumpAnalyzer &mdash; coredumpanalyzer.com</div>
+    <div style="font-size:10px;color:#9ca3af">Developed by Devendra Pillay &copy; 2026</div>
+  </div>
+
+</div>`;
+
+  document.getElementById('rca-preview').innerHTML = html;
+  rcaRendered = true;
+}
+
+function downloadRCA(format) {
+  if (!rcaRendered) renderRCA();
+
+  var r       = curResult;
+  var fname   = (r && r.fileName) ? r.fileName.replace(/\.[^.]+$/, '') : 'crash';
+  var date    = new Date().toISOString().slice(0,10);
+  var docName = 'RCA_' + fname + '_' + date;
+
+  var docContent = document.getElementById('rca-doc');
+  if (!docContent) { renderRCA(); docContent = document.getElementById('rca-doc'); }
+
+  if (format === 'pdf') {
+    // Open in new window and trigger print dialog (Save as PDF)
+    var win = window.open('', '_blank');
+    win.document.write('<html><head><title>' + docName + '</title>');
+    win.document.write('<style>@media print{body{margin:0}}</style>');
+    win.document.write('</head><body>');
+    win.document.write(docContent.outerHTML);
+    win.document.write('</body></html>');
+    win.document.close();
+    setTimeout(function() { win.print(); }, 500);
+
+  }
+}
 
 /* gate handled in <head> */
 </script>
