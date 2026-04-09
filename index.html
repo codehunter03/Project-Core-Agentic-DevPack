@@ -1360,37 +1360,40 @@ function dlFixed() {
 //  RENDER CODE FIX TAB
 // ══════════════════════════════════════════════
 function renderCodeFix(r) {
-  const cf = r.code_fix;
-  const bugEl = document.getElementById('cf-buggy');
-  const fixEl = document.getElementById('cf-fixed');
+  var bugEl = document.getElementById('cf-buggy');
+  var fixEl = document.getElementById('cf-fixed');
+  if (!bugEl || !fixEl) return;
   bugEl.innerHTML = ''; fixEl.innerHTML = '';
 
-  if (!cf) {
-    // Fallback: extract lines around faulting_line from original source
-    const lines = (r.originalSource||'').split('\n');
-    const fl = r.faulting_line || 1;
-    const fixLines = (r.fixed_code||'').split('\n');
-    renderFallbackCodeFix(bugEl, lines, fl, 'bug');
-    renderFallbackCodeFix(fixEl, fixLines, fl, 'fix');
-    document.getElementById('cf-bug-loc').textContent = `${r.faulting_function||'unknown'}() — line ${fl}`;
-    document.getElementById('cf-fix-loc').textContent = `Patched at line ${fl}`;
+  var fl  = r.faulting_line  || r.buggy_line_num  || 1;
+  var fln = r.fixed_line_num || fl;
+  var fn  = r.faulting_function || 'unknown';
+
+  document.getElementById('cf-bug-loc').textContent = fn + '() — line ' + fl;
+  document.getElementById('cf-fix-loc').textContent = 'Fixed at line ' + fln;
+
+  // Use new flat fields if available
+  if (r.buggy_line_code) {
+    // Build synthetic snippets from flat fields
+    var bugSnippet = [{ line: fl,  code: r.buggy_line_code, annotation: r.buggy_line_reason || '' }];
+    var fixSnippet = [{ line: fln, code: r.fixed_line_code || r.buggy_line_code, annotation: r.fixed_line_reason || '' }];
+
+    // Get context from original source
+    var srcLines  = (r.originalSource || '').split('\n');
+    var fixLines  = (r.fixed_code    || '').split('\n');
+    var ctxBefore = srcLines.slice(Math.max(0, fl - 4), fl - 1).join('\n');
+    var ctxAfter  = srcLines.slice(fl, Math.min(srcLines.length, fl + 3)).join('\n');
+
+    renderAnnotatedSnippet(bugEl, ctxBefore, bugSnippet, ctxAfter, 'bug');
+    renderAnnotatedSnippet(fixEl, ctxBefore, fixSnippet, ctxAfter, 'fix');
     return;
   }
 
-  // Location labels
-  const bugLines = cf.buggy_snippet||[];
-  const fixLines2 = cf.fixed_snippet||[];
-  const firstBugLine = bugLines[0]?.line || r.faulting_line || '?';
-  const lastBugLine  = bugLines[bugLines.length-1]?.line || firstBugLine;
-  document.getElementById('cf-bug-loc').textContent =
-    `${r.faulting_function||''}() — line${bugLines.length>1?'s ':' '}${firstBugLine}${bugLines.length>1?'–'+lastBugLine:''}`;
-  document.getElementById('cf-fix-loc').textContent =
-    `Fixed line${fixLines2.length>1?'s ':' '}${fixLines2[0]?.line||'?'}${fixLines2.length>1?'–'+fixLines2[fixLines2.length-1]?.line:''}`;
-
-  // Render buggy snippet
-  renderAnnotatedSnippet(bugEl, cf.context_before, bugLines, cf.context_after, 'bug');
-  // Render fixed snippet
-  renderAnnotatedSnippet(fixEl, cf.context_before, fixLines2, cf.context_after, 'fix');
+  // Fallback: extract from source around faulting line
+  var lines    = (r.originalSource || '').split('\n');
+  var fixedLns = (r.fixed_code    || '').split('\n');
+  renderFallbackCodeFix(bugEl, lines,    fl,  'bug');
+  renderFallbackCodeFix(fixEl, fixedLns, fln, 'fix');
 }
 
 function renderAnnotatedSnippet(container, ctxBefore, annotatedLines, ctxAfter, type) {
