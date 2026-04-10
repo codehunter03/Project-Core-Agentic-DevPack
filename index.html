@@ -1070,6 +1070,28 @@ void causeCrash() {
         <div id="r-tips"></div>
       </div>
 
+      <!-- ══ FEEDBACK BAR ══ -->
+      <div id="feedback-bar" style="display:none;margin:0 0 1rem 0;padding:.75rem 1rem;
+        background:var(--s2);border:1px solid var(--s4);border-radius:8px;
+        align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:.75rem;color:var(--t2);font-weight:600">
+          💡 Did this fix resolve your crash?
+        </span>
+        <button id="fb-yes" onclick="sendFeedback(true)"
+          style="background:rgba(0,200,83,.12);border:1px solid #00c853;color:#00c853;
+          border-radius:6px;padding:5px 16px;font-size:.72rem;cursor:pointer;
+          font-family:inherit;font-weight:600;transition:all .15s;">
+          ✅ Yes, it worked
+        </button>
+        <button id="fb-no" onclick="sendFeedback(false)"
+          style="background:rgba(255,59,48,.10);border:1px solid #ff3b30;color:#ff3b30;
+          border-radius:6px;padding:5px 16px;font-size:.72rem;cursor:pointer;
+          font-family:inherit;font-weight:600;transition:all .15s;">
+          ❌ No, still crashing
+        </button>
+        <span id="fb-status" style="font-size:.7rem;color:var(--t3);margin-left:auto"></span>
+      </div>
+
       <!-- ══ ITERATIVE FIX CHAT ══ -->
       <div id="followup-section">
         <div class="chat-label">🔁 Follow-up — Still broken? Describe what happened after applying the fix</div>
@@ -1127,7 +1149,7 @@ const BUG_ICO = {
 // ══════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════
-let curResult = null, curOrig = '', curFname = 'source.cpp';
+let curResult = null, curOrig = '', curFname = 'source.cpp', curAnalysisId = null;
 
 // ══════════════════════════════════════════════
 //  API KEY MANAGEMENT
@@ -1499,6 +1521,9 @@ function renderResult(r) {
   // Show follow-up chat, reset history for new analysis
   chatHistory = []; chatIteration = 0;
   rcaRendered = false;
+  curAnalysisId = null;
+  var fbBar = document.getElementById('feedback-bar');
+  if (fbBar) fbBar.style.display = 'none';
   var ch = document.getElementById('chat-history');
   if (ch) ch.innerHTML = '';
   var rcaPrev = document.getElementById('rca-preview');
@@ -1638,6 +1663,15 @@ async function runAnalysis() {
     var elapsed = Math.round((Date.now() - analysisStart) / 1000);
     lg('✅ Analysis complete in ' + elapsed + 's!', 'ok');
     renderResult(curResult);
+    // Show feedback bar
+    curAnalysisId = respData.analysis_id || null;
+    var fbBar = document.getElementById('feedback-bar');
+    if (fbBar) {
+      fbBar.style.display = 'flex';
+      document.getElementById('fb-yes').disabled = false;
+      document.getElementById('fb-no').disabled  = false;
+      document.getElementById('fb-status').textContent = '';
+    }
 
   } catch(err) {
     lg('❌ '+err.message,'err');
@@ -2470,6 +2504,58 @@ function downloadRCA(format) {
     win.document.close();
     setTimeout(function() { win.print(); }, 500);
 
+  }
+}
+
+
+// ══════════════════════════════════════════════════════
+//  FEEDBACK — "Did the fix work?" button handler
+// ══════════════════════════════════════════════════════
+async function sendFeedback(worked) {
+  var btnYes = document.getElementById('fb-yes');
+  var btnNo  = document.getElementById('fb-no');
+  var status = document.getElementById('fb-status');
+
+  if (btnYes) btnYes.disabled = true;
+  if (btnNo)  btnNo.disabled  = true;
+  if (status) status.textContent = 'Saving...';
+
+  try {
+    var teamToken = localStorage.getItem('devpack_team_token') || '';
+    var apiKey    = localStorage.getItem('devpack_api_key')    || '';
+
+    var payload = {
+      fix_worked:   worked,
+      analysis_id:  curAnalysisId || 'unknown',
+    };
+
+    var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/feedback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key':    apiKey,
+        'X-Team-Token': teamToken,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (status) {
+      if (worked) {
+        status.textContent = '✅ Great! Feedback saved — the tool learns from this.';
+        status.style.color = '#00c853';
+      } else {
+        status.textContent = '❌ Got it — try the follow-up chat below to refine the fix.';
+        status.style.color = '#ff3b30';
+        // Scroll to follow-up chat
+        var fs = document.getElementById('followup-section');
+        if (fs) setTimeout(function() { fs.scrollIntoView({ behavior: 'smooth' }); }, 500);
+      }
+    }
+  } catch(e) {
+    if (status) {
+      status.textContent = 'Could not save — but thank you!';
+      status.style.color = 'var(--t3)';
+    }
   }
 }
 
