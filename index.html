@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CoreDumpAnalyzer — Core Dump Analyzer & Auto-Fix Engine</title>
 <meta name="description" content="AI-powered core dump analyzer and auto-fix engine. Diagnose crashes, identify root causes and generate fixes instantly.">
@@ -1194,9 +1196,10 @@ async function loadUserPlan(userId) {
   // Always update pill with real data
   updateUsagePill();
 
-  // Lock tool if already at limit
+  // Lock tool if already at limit — use setTimeout to ensure DOM is fully ready
   if (currentPlan !== 'pro' && analysesUsed >= analysesLimit) {
-    lockToolForUpgrade();
+    console.log('[CDA] Limit reached on load — locking tool');
+    setTimeout(lockToolForUpgrade, 100);
   }
 }
 
@@ -1259,27 +1262,35 @@ function checkAnalysisLimit() {
 async function incrementUsage() {
   if (currentPlan === 'pro' || !currentUser) return;
 
-  // Increment locally
-  analysesUsed++;
-
-  // Update Supabase — use rpc increment to avoid race conditions
   try {
-    const { data } = await supa
+    // Step 1: Read fresh value from Supabase (source of truth)
+    const { data: current } = await supa
       .from('users')
-      .update({ analyses_used: analysesUsed })
+      .select('analyses_used, analyses_limit')
       .eq('id', currentUser.id)
-      .select('analyses_used')
       .single();
 
-    // Use server value if returned (source of truth)
-    if (data && typeof data.analyses_used === 'number') {
-      analysesUsed = data.analyses_used;
-    }
+    var freshUsed  = (current?.analyses_used  ?? analysesUsed);
+    var freshLimit = (current?.analyses_limit ?? analysesLimit);
+    var newCount   = freshUsed + 1;
+
+    // Step 2: Write incremented value back
+    await supa
+      .from('users')
+      .update({ analyses_used: newCount })
+      .eq('id', currentUser.id);
+
+    // Step 3: Update local state from server values
+    analysesUsed  = newCount;
+    analysesLimit = freshLimit;
+    console.log('[CDA] Usage updated:', analysesUsed, '/', analysesLimit);
+
   } catch(e) {
-    console.log('[CDA] Could not update usage:', e.message);
+    console.log('[CDA] Usage update error:', e.message);
+    analysesUsed++; // fallback: at least increment locally
   }
 
-  // Update pill with real value
+  // Always update pill after
   updateUsagePill();
 
   // Show locked modal if at limit
@@ -1314,33 +1325,97 @@ function closeUpgradeModal() {
   document.getElementById('upgrade-modal').classList.remove('show');
 }
 function lockToolForUpgrade() {
+  // If DOM not ready yet, wait for it
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { lockToolForUpgrade(); });
+    return;
+  }
+
   // Disable run button
   var runBtn = document.getElementById('run-btn');
   if (runBtn) {
-    runBtn.disabled        = true;
-    runBtn.textContent     = '🔒 Upgrade to Analyze';
-    runBtn.onclick         = function() { showUpgradeModal(true); };
-    runBtn.style.background = '#21262d';
+    runBtn.disabled         = true;
+    runBtn.textContent      = '🔒 Upgrade to Continue';
+    runBtn.onclick          = function() { showUpgradeModal(true); };
+    runBtn.style.background = 'linear-gradient(135deg,#21262d,#161b22)';
     runBtn.style.color      = '#8b949e';
     runBtn.style.cursor     = 'pointer';
+    runBtn.style.border     = '1px solid #30363d';
   }
+
+  // Disable all inputs and textareas in workspace
+  ['bt','src'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.disabled = true;
+      el.style.opacity = '0.5';
+      el.style.cursor  = 'not-allowed';
+    }
+  });
+
   // Show persistent bottom banner
   if (!document.getElementById('upgrade-banner')) {
     var banner = document.createElement('div');
     banner.id = 'upgrade-banner';
-    banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;' +
-      'background:linear-gradient(135deg,#1f3c6e,#2d1f6e);' +
-      'border-top:1px solid rgba(88,166,255,.2);' +
-      'padding:.75rem 1.5rem;display:flex;align-items:center;' +
-      'justify-content:space-between;gap:1rem;flex-wrap:wrap;';
+    banner.style.cssText = [
+      'position:fixed;bottom:0;left:0;right:0;z-index:9999',
+      'background:linear-gradient(135deg,#1a1f2e,#1f1a3d)',
+      'border-top:2px solid rgba(88,166,255,.25)',
+      'padding:1rem 1.5rem',
+      'display:flex;align-items:center;justify-content:space-between',
+      'gap:1rem;flex-wrap:wrap',
+      'box-shadow:0 -4px 24px rgba(0,0,0,.5)',
+    ].join(';');
     banner.innerHTML =
-      '<span style="color:#e6edf3;font-size:.85rem;font-weight:600">' +
-      '🔒 You\'ve used all 3 free analyses — upgrade to continue</span>' +
-      '<button onclick="showUpgradeModal(true)" style="background:linear-gradient(135deg,#1f6feb,#8957e5);' +
-      'border:none;color:#fff;border-radius:8px;padding:8px 20px;' +
-      'font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">' +
-      '⚡ Upgrade — $9.99/month</button>';
+      '<div>' +
+        '<div style="color:#e6edf3;font-size:.9rem;font-weight:700;margin-bottom:.2rem">' +
+          '🔒 You\'ve used all 3 free analyses' +
+        '</div>' +
+        '<div style="color:#8b949e;font-size:.75rem">' +
+          'Upgrade to Pro for unlimited crash analyses' +
+        '</div>' +
+      '</div>' +
+      '<button onclick="showUpgradeModal(true)" style="' +
+        'background:linear-gradient(135deg,#1f6feb,#8957e5);' +
+        'border:none;color:#fff;border-radius:10px;' +
+        'padding:10px 24px;font-size:.88rem;font-weight:700;' +
+        'cursor:pointer;font-family:inherit;white-space:nowrap;' +
+        'box-shadow:0 4px 16px rgba(31,111,235,.35)">' +
+        '⚡ Upgrade — $9.99/month' +
+      '</button>';
     document.body.appendChild(banner);
+  }
+
+  // Also add overlay to workspace so clicking shows modal
+  if (!document.getElementById('workspace-lock')) {
+    var overlay = document.createElement('div');
+    overlay.id = 'workspace-lock';
+    overlay.onclick = function() { showUpgradeModal(true); };
+    overlay.style.cssText = [
+      'position:fixed;inset:0;z-index:998',
+      'cursor:pointer',
+      'background:rgba(13,17,23,.7)',
+      'backdrop-filter:blur(2px)',
+      'display:flex;align-items:center;justify-content:center',
+    ].join(';');
+    overlay.innerHTML =
+      '<div style="text-align:center;padding:2rem">' +
+        '<div style="font-size:3rem;margin-bottom:1rem">🔒</div>' +
+        '<div style="color:#e6edf3;font-size:1.1rem;font-weight:700;margin-bottom:.5rem">' +
+          'Free analyses used' +
+        '</div>' +
+        '<div style="color:#8b949e;font-size:.85rem;margin-bottom:1.5rem">' +
+          'Upgrade to Pro to continue analyzing crashes' +
+        '</div>' +
+        '<button onclick="showUpgradeModal(true)" style="' +
+          'background:linear-gradient(135deg,#1f6feb,#8957e5);' +
+          'border:none;color:#fff;border-radius:10px;' +
+          'padding:12px 28px;font-size:.95rem;font-weight:800;' +
+          'cursor:pointer;font-family:inherit">' +
+          '⚡ Upgrade — $9.99/month' +
+        '</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
   }
 }
 
@@ -3016,6 +3091,22 @@ async function runSelfTest() {
 }
 
 // On page load
+// Block back-button bypass — fires on bfcache restore too
+window.addEventListener('pageshow', function(e) {
+  // e.persisted = true means page came from browser cache (back button)
+  if (e.persisted) {
+    // Re-check limit — user might have used all analyses then hit back
+    if (currentPlan !== 'pro' && analysesUsed >= analysesLimit) {
+      lockToolForUpgrade();
+      showUpgradeModal(true);
+    }
+    // Reload plan from Supabase to get fresh count
+    if (currentUser) {
+      loadUserPlan(currentUser.id);
+    }
+  }
+});
+
 window.addEventListener('load', function() {
   // Remove old API key from localStorage — now server-side only
   try { localStorage.removeItem('devpack_api_key'); } catch(e) {}
