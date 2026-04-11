@@ -885,16 +885,22 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
   try {
     // Check for Supabase session token in localStorage
     var hasSupabaseSession = false;
-    for (var i = 0; i < localStorage.length; i++) {
-      var key = localStorage.key(i);
-      if (key && key.includes('supabase.auth.token')) {
-        try {
-          var val = JSON.parse(localStorage.getItem(key));
-          if (val && val.access_token) {
-            hasSupabaseSession = true;
-            break;
-          }
-        } catch(e) {}
+    // Check our custom storage key
+    var stored = localStorage.getItem('cda-auth');
+    if (stored) {
+      try {
+        var val = JSON.parse(stored);
+        if (val && val.access_token) hasSupabaseSession = true;
+      } catch(e) {}
+    }
+    // Also check default Supabase key
+    if (!hasSupabaseSession) {
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('sb-'))) {
+          hasSupabaseSession = true;
+          break;
+        }
       }
     }
 
@@ -908,10 +914,15 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
     // If session found: keep spinner, SDK will handle it
   } catch(e) {
     // On any error: show login
-    document.addEventListener('DOMContentLoaded', function() {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        var gate = document.getElementById('gate');
+        if (gate) gate.className = '';
+      });
+    } else {
       var gate = document.getElementById('gate');
       if (gate) gate.className = '';
-    });
+    }
   }
 })();
 </script>
@@ -937,7 +948,8 @@ async function initSupabase() {
       autoRefreshToken:   true,
       persistSession:     true,
       detectSessionInUrl: true,
-      flowType:           'implicit',  // GitHub Pages = no server, use implicit
+      storageKey:         'cda-auth',
+      storage:            window.localStorage,
     }
   });
 
@@ -1380,7 +1392,7 @@ function toggleGateEye() {}
   <div class="hbadges">
     <span class="pill" style="color:#56d364;border-color:#238636;background:rgba(35,134,54,.1)">v1.0</span>
     <span class="pill" id="model-badge" style="color:#8b949e;border-color:#30363d;background:#161b22">claude-haiku-4-5</span>
-    <span class="pill" id="key-badge" style="color:#e3b341;border-color:#e3b341;background:rgba(227,179,65,.08)">⚠ No API Key</span>
+    <span class="pill" id="key-badge" style="display:none"></span>
     <button onclick="showUpgradeModal()" id="upgrade-btn" style="display:none;
       background:linear-gradient(135deg,#1f6feb,#388bfd);border:none;color:#fff;
       border-radius:5px;padding:4px 12px;font-size:.68rem;font-weight:700;
@@ -1392,8 +1404,7 @@ function toggleGateEye() {}
 </header>
 
 <!-- ══ USER INFO BAR ══ -->
-<div id="key-banner" style="display:none">
-</div>
+<div id="key-banner" style="display:none!important"></div>
 
 <!-- ══ WORKSPACE ══ -->
 <div class="workspace">
@@ -1686,17 +1697,9 @@ let curResult = null, curOrig = '', curFname = 'source.cpp', curAnalysisId = nul
 function loadKey() {
   const k = localStorage.getItem('devpack_api_key') || '';
   document.getElementById('api-key-input').value = k;
-  updateKeyBadge(k);
 }
-function saveKey() {
-  const k = document.getElementById('api-key-input').value.trim();
-  if (!k) { setKeyStatus('⚠ Please enter a key','#e3b341'); return; }
-  if (!k.startsWith('sk-ant-')) { setKeyStatus('⚠ Key should start with sk-ant-','#ff6b6b'); return; }
-  localStorage.setItem('devpack_api_key', k);
-  setKeyStatus('✅ Key saved!','#56d364');
-  updateKeyBadge(k);
-  setTimeout(() => setKeyStatus('Key is saved in your browser only — never sent to any server except Anthropic.','#484f58'), 2500);
-}
+function saveKey() {} // Removed — key handled server-side
+
 function setKeyStatus(msg, color) {
   const el = document.getElementById('key-status');
   el.textContent = msg; el.style.color = color;
@@ -1713,79 +1716,13 @@ function updateKeyBadge(k) {
     b.style.background = 'rgba(227,179,65,.08)';
   }
 }
-async function testApiKey() {
-  var apiKey = localStorage.getItem('devpack_api_key') ||
-               document.getElementById('api-key-input').value.trim();
-  var btn    = document.getElementById('test-key-btn');
+async function testApiKey() {} // Key handled server-side
 
-  if (!apiKey || !apiKey.startsWith('sk-ant-')) {
-    setKeyStatus('⚠ Save a valid key first (starts with sk-ant-)', '#e3b341');
-    return;
-  }
 
-  btn.disabled = true;
-  btn.textContent = '⏳ Testing...';
-  setKeyStatus('Testing your API key...', '#8b949e');
 
-  try {
-    // Test via our Lambda (validates key server-side)
-    var teamToken = localStorage.getItem('devpack_team_token') || '';
-    var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/health', {
-      method: 'GET',
-      headers: {
-        'X-Api-Key':    apiKey,
-        'X-Team-Token': teamToken,
-      }
-    });
+function clearApiKey() {} // Removed — key handled server-side
 
-    if (resp.status === 200) {
-      setKeyStatus('✅ Key is valid and working!', '#56d364');
-      updateKeyBadge(apiKey);
-      btn.textContent = '✅ Valid';
-      setTimeout(function() { btn.textContent = '⚡ Test Key'; }, 3000);
-    } else if (resp.status === 401) {
-      setKeyStatus('❌ Invalid key — check at console.anthropic.com', '#ff6b6b');
-      updateKeyBadge('');
-      btn.textContent = '❌ Invalid';
-      setTimeout(function() { btn.textContent = '⚡ Test Key'; }, 3000);
-    } else if (resp.status === 402) {
-      setKeyStatus('⚠ Key valid but no credits — add at console.anthropic.com/settings/billing', '#e3b341');
-      updateKeyBadge(apiKey);
-      btn.textContent = '⚠ No Credits';
-      setTimeout(function() { btn.textContent = '⚡ Test Key'; }, 4000);
-    } else if (resp.status === 429) {
-      setKeyStatus('⚠ Key valid but rate limited — wait 30s and retry', '#e3b341');
-      updateKeyBadge(apiKey);
-      btn.textContent = '⚠ Rate Limited';
-      setTimeout(function() { btn.textContent = '⚡ Test Key'; }, 3000);
-    } else {
-      setKeyStatus('⚠ Unexpected response: HTTP ' + resp.status, '#e3b341');
-      btn.textContent = '⚡ Test Key';
-    }
-  } catch(err) {
-    setKeyStatus('❌ Connection error — check your internet', '#ff6b6b');
-    btn.textContent = '⚡ Test Key';
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-function clearApiKey() {
-  localStorage.removeItem('devpack_api_key');
-  var inp = document.getElementById('api-key-input');
-  if (inp) inp.value = '';
-  setKeyStatus('Key cleared from this browser.', '#e3b341');
-  updateKeyBadge('');
-  setTimeout(function() {
-    setKeyStatus('Each team member enters their own key — stays in their browser only.', '#484f58');
-  }, 2500);
-}
-
-function toggleKeyVis() {
-  const inp = document.getElementById('api-key-input');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-document.getElementById('api-key-input').addEventListener('keydown', e => { if(e.key==='Enter') saveKey(); });
+function toggleKeyVis() {} // Removed — key handled server-side
 
 // ══════════════════════════════════════════════
 //  FILE UPLOAD
@@ -2223,7 +2160,7 @@ async function runAnalysis() {
 
   clearErr(); clearLog();
 
-  if(!apiKey||!apiKey.startsWith('sk-ant-')){
+  if(!apiKey||!(apiKey === 'server-managed' || apiKey.startsWith('sk-ant-'))){
     showErr('Please enter and save your Anthropic API key first (above).'); return;
   }
   if(!bt){showErr('Please paste a GDB backtrace or core dump output.');return;}
@@ -2435,7 +2372,7 @@ function formatAssistantResponse(text) {
 }
 
 async function sendFollowup() {
-  var apiKey  = localStorage.getItem('devpack_api_key') || 'server-managed';
+  var apiKey  = 'server-managed';
   var inp     = document.getElementById('followup-input');
   var model   = document.getElementById('model-sel');
   var sendBtn = document.getElementById('send-followup-btn');
@@ -2443,7 +2380,7 @@ async function sendFollowup() {
   var userMsg = inp ? inp.value.trim() : '';
 
   if (!userMsg) return;
-  if (!apiKey || !apiKey.startsWith('sk-ant-')) {
+  if (!apiKey) {
     alert('Please save your API key first.'); return;
   }
   if (!curResult) {
@@ -2545,7 +2482,7 @@ document.getElementById('bt').addEventListener('input', function() {
     var apiKey    = localStorage.getItem('devpack_api_key') || '';
     var teamToken = localStorage.getItem('devpack_team_token') || '';
 
-    if (!apiKey || !apiKey.startsWith('sk-ant-')) {
+    if (!apiKey) {
       if (typing) typing.classList.remove('show');
       if (status) status.textContent = '';
       if (list) list.innerHTML = '<div style="color:var(--t3);font-size:.72rem">💡 Save your API key above to auto-scan required files.</div>';
@@ -2647,7 +2584,7 @@ async function runAdvisor() {
   var rerunBtn = document.getElementById('advisor-rerun-btn');
 
   if (!bt || bt.length < 20) return;
-  if (!apiKey || !apiKey.startsWith('sk-ant-')) return;
+  if (!apiKey) return;
   var teamToken = localStorage.getItem('devpack_team_token') || '';
   if (!teamToken) return; // Not logged in yet
 
@@ -2858,7 +2795,7 @@ async function runSelfTest() {
   console.group('[DevPack Self-Test] Running health checks...');
 
   // ── CHECK 1: API Key ──────────────────────────────────────────────────
-  var keyOk = apiKey && apiKey.startsWith('sk-ant-');
+  var keyOk = apiKey && ((apiKey === 'server-managed' || apiKey.startsWith('sk-ant-')) || apiKey === 'server-managed');
   stLog('① API Key', keyOk ? 'pass' : 'fail',
     keyOk ? 'Present and format valid' : 'Missing or invalid');
   if (keyOk) passed++; else { failed++; stLog('Remaining checks', 'skip', 'No API key'); console.groupEnd(); stRunning = false; return; }
@@ -2949,6 +2886,7 @@ async function runSelfTest() {
   // ── CHECK 7: UI Components ────────────────────────────────────────────
   var required = ['bt','src','run-btn','result','r-exp','r-fix',
                   'r-orig','r-diff','r-fixed','followup-section','chat-history'];
+  // Note: api-key-input removed — key handled server-side
   var missingUI = required.filter(function(id){ return !document.getElementById(id); });
   stLog('⑦ UI Components', missingUI.length === 0 ? 'pass' : 'fail',
     missingUI.length === 0
@@ -2971,7 +2909,7 @@ async function runSelfTest() {
 // Auto-run silently on page load when API key already saved
 window.addEventListener('load', function() {
   var apiKey = localStorage.getItem('devpack_api_key') || '';
-  if (apiKey && apiKey.startsWith('sk-ant-')) {
+  if (apiKey === 'server-managed' || (apiKey && (apiKey === 'server-managed' || apiKey.startsWith('sk-ant-')))) {
     // Warm up Lambda immediately to eliminate cold start delay
     setTimeout(warmLambda, 500);
     // Self-test runs after warm-up
