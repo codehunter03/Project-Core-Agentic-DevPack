@@ -823,58 +823,50 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 // ══════════════════════════════════════════════════════════════
 //  SUPABASE AUTH — CoreDumpAnalyzer
 // ══════════════════════════════════════════════════════════════
 const SUPA_URL  = 'https://qhwcvojiqzjlzlqqhvvo.supabase.co';
-const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFod2N2b2ppcXpqbHpscXFodnZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MzY2NjEsImV4cCI6MjA5MTQxMjY2MX0.g7FowZL0-kUKsl4T7BsbQ5DlTYm2wxbCIsaCHu-gpnE';
+const SUPA_ANON = 'sb_publishable_VGkKnxCdDtLk2NJ79Msu-g_FXU9S';
 
 // Init Supabase client — deferred to ensure SDK is loaded
 var supa = null;
-async function initSupabase() {
+function initSupabase() {
   if (typeof supabase === 'undefined') {
     setTimeout(initSupabase, 50);
     return;
   }
-
-  // If URL has access_token (OAuth callback), show loading state
-  if (window.location.hash.includes('access_token') ||
-      window.location.search.includes('code=')) {
-    var gate = document.getElementById('gate');
-    if (gate) gate.innerHTML = '<div style="color:#e6edf3;font-size:1rem;text-align:center;padding:3rem"><div style="font-size:2rem;margin-bottom:1rem">⏳</div>Signing you in...</div>';
-  }
-
   const { createClient } = supabase;
   supa = createClient(SUPA_URL, SUPA_ANON, {
     auth: {
-      autoRefreshToken:   true,
-      persistSession:     true,
-      detectSessionInUrl: true,
-      flowType:           'implicit',  // GitHub Pages = no server, use implicit
+      autoRefreshToken:    true,
+      persistSession:      true,
+      detectSessionInUrl:  true,
+      flowType:            'pkce',
     }
   });
 
-  // Handle auth state — catches both OAuth redirect and existing sessions
+  // Listen FIRST — before getSession — to catch OAuth callback
   supa.auth.onAuthStateChange(async function(event, session) {
-    console.log('[CDA Auth] Event:', event, '| User:', session?.user?.email || 'none');
-    if (event === 'SIGNED_IN' && session?.user) {
+    console.log('Auth event:', event, session?.user?.email);
+    if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
       await onAuthSuccess(session.user);
     }
     if (event === 'SIGNED_OUT') {
-      currentUser = null;
       var gate = document.getElementById('gate');
       if (gate) gate.className = '';
     }
   });
 
-  // Check for existing session (covers page refresh with valid session)
-  const { data: sessionData } = await supa.auth.getSession();
-  console.log('[CDA Auth] Initial session:', sessionData?.session?.user?.email || 'none');
-  if (sessionData?.session?.user) {
-    await onAuthSuccess(sessionData.session.user);
-  }
+  // Then check for existing session
+  supa.auth.getSession().then(function(res) {
+    console.log('Session check:', res.data?.session?.user?.email || 'none');
+    if (res.data?.session?.user) {
+      onAuthSuccess(res.data.session.user);
+    }
+  });
 }
 initSupabase();
 
@@ -916,15 +908,15 @@ function setAuthMsg(msg, type) {
 
 // ── Google Sign In ────────────────────────────────────────────
 async function signInWithGoogle() {
-  if (!supa) { setAuthMsg('Still loading — please wait a moment', 'err'); return; }
   setAuthMsg('Redirecting to Google...', '');
   const { error } = await supa.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: 'https://coredumpanalyzer.com/',
+      redirectTo: 'https://coredumpanalyzer.com',
+      skipBrowserRedirect: false,
     }
   });
-  if (error) { setAuthMsg(error.message, 'err'); console.error('OAuth error:', error); }
+  if (error) setAuthMsg(error.message, 'err');
 }
 
 // ── Email Sign In ─────────────────────────────────────────────
