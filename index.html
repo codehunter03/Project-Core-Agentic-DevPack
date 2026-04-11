@@ -179,7 +179,7 @@ header{
   border-bottom:1px solid var(--s4);
   padding:0 1.5rem; height:58px;
   display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:200;
+  position:sticky;top:0;z-index:1000;
   box-shadow:0 1px 0 rgba(255,255,255,0.04);
 }
 .logo{display:flex;align-items:center;gap:12px}
@@ -1350,6 +1350,9 @@ function lockToolForUpgrade() {
     runBtn.style.cursor     = 'pointer';
     runBtn.style.border     = '1px solid #30363d';
   }
+  // Always show upgrade button in header when locked
+  var upgrBtn = document.getElementById('upgrade-btn');
+  if (upgrBtn) upgrBtn.style.display = 'block';
 
   // Disable all inputs and textareas in workspace
   ['bt','src'].forEach(function(id) {
@@ -1394,32 +1397,38 @@ function lockToolForUpgrade() {
     document.body.appendChild(banner);
   }
 
-  // Also add overlay to workspace so clicking shows modal
+  // Add overlay ONLY over the workspace area (below header)
   if (!document.getElementById('workspace-lock')) {
     var overlay = document.createElement('div');
     overlay.id = 'workspace-lock';
     overlay.onclick = function() { showUpgradeModal(true); };
+    // Position below header (~60px), above footer banner (~70px)
     overlay.style.cssText = [
-      'position:fixed;inset:0;z-index:99990',
+      'position:fixed',
+      'top:60px',           // below header
+      'left:0;right:0',
+      'bottom:70px',        // above bottom banner
+      'z-index:500',        // above workspace content, below header (200) is wrong — header is 200 sticky
       'cursor:pointer',
-      'background:rgba(13,17,23,.7)',
-      'backdrop-filter:blur(2px)',
+      'background:rgba(13,17,23,.75)',
+      'backdrop-filter:blur(3px)',
       'display:flex;align-items:center;justify-content:center',
     ].join(';');
     overlay.innerHTML =
-      '<div style="text-align:center;padding:2rem">' +
+      '<div style="text-align:center;padding:2rem;pointer-events:none">' +
         '<div style="font-size:3rem;margin-bottom:1rem">🔒</div>' +
-        '<div style="color:#e6edf3;font-size:1.1rem;font-weight:700;margin-bottom:.5rem">' +
+        '<div style="color:#e6edf3;font-size:1.2rem;font-weight:700;margin-bottom:.5rem">' +
           'Free analyses used' +
         '</div>' +
         '<div style="color:#8b949e;font-size:.85rem;margin-bottom:1.5rem">' +
-          'Upgrade to Pro to continue analyzing crashes' +
+          'Upgrade to Pro for unlimited crash analyses' +
         '</div>' +
-        '<button onclick="showUpgradeModal(true)" style="' +
+        '<button onclick="event.stopPropagation();showUpgradeModal(true)" style="' +
           'background:linear-gradient(135deg,#1f6feb,#8957e5);' +
           'border:none;color:#fff;border-radius:10px;' +
           'padding:12px 28px;font-size:.95rem;font-weight:800;' +
-          'cursor:pointer;font-family:inherit">' +
+          'cursor:pointer;font-family:inherit;pointer-events:all;' +
+          'box-shadow:0 4px 20px rgba(31,111,235,.4)">' +
           '⚡ Upgrade — $9.99/month' +
         '</button>' +
       '</div>';
@@ -1439,18 +1448,27 @@ function goToCheckout() {
 
 // ── Sign out ──────────────────────────────────────────────────
 async function signOut() {
+  // Remove overlay first so sign out button is accessible
+  var lock = document.getElementById('workspace-lock');
+  if (lock) lock.remove();
+  var banner = document.getElementById('upgrade-banner');
+  if (banner) banner.remove();
+
   try { await supa.auth.signOut(); } catch(e) {}
+
   // Clear all stored session data
-  localStorage.removeItem('cda-session');
-  localStorage.removeItem('cda-auth-v1');
-  localStorage.removeItem('devpack_team_token');
-  localStorage.removeItem('cda_user_email');
+  ['cda-session','cda-auth-v1','devpack_team_token',
+   'cda_user_email','cda-auth'].forEach(function(k) {
+    localStorage.removeItem(k);
+  });
   sessionStorage.removeItem('cda_logged_in');
-  // Clear any supabase keys
+
+  // Clear supabase keys
   Object.keys(localStorage).forEach(function(k) {
     if (k.includes('supabase') || k.includes('sb-')) localStorage.removeItem(k);
   });
-  // Hard reload — cleanest way to reset all state
+
+  // Hard reload
   window.location.href = window.location.pathname;
 }
 
@@ -1578,10 +1596,10 @@ function toggleGateEye() {}
     <span class="pill" style="color:#56d364;border-color:#238636;background:rgba(35,134,54,.1)">v1.0</span>
     <span class="pill" id="model-badge" style="color:#8b949e;border-color:#30363d;background:#161b22">claude-haiku-4-5</span>
     <span class="pill" id="key-badge" style="display:none"></span>
-    <button onclick="showUpgradeModal()" id="upgrade-btn" style="display:none;
-      background:linear-gradient(135deg,#1f6feb,#388bfd);border:none;color:#fff;
-      border-radius:5px;padding:4px 12px;font-size:.68rem;font-weight:700;
-      cursor:pointer;font-family:inherit">⚡ Upgrade</button>
+    <button onclick="showUpgradeModal(true)" id="upgrade-btn" style="display:none;
+      background:linear-gradient(135deg,#1f6feb,#8957e5);border:none;color:#fff;
+      border-radius:6px;padding:5px 14px;font-size:.72rem;font-weight:700;
+      cursor:pointer;font-family:inherit;z-index:1001;position:relative">⚡ Upgrade Pro</button>
     <button onclick="signOut()" style="background:none;border:1px solid var(--s5);
       color:var(--t3);border-radius:5px;padding:4px 10px;font-size:.65rem;
       cursor:pointer;font-family:inherit" title="Sign out">↪ Sign out</button>
