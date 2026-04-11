@@ -44,65 +44,112 @@ body{
 /* ─── PASSWORD GATE ─── */
 #gate{
   position:fixed;inset:0;z-index:99999;
-  background:var(--bg);
+  background:#0d1117;
   display:flex;align-items:center;justify-content:center;
+  padding:1.5rem;
 }
 #gate.hidden{display:none}
+@keyframes slideup{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
 .gate-box{
-  width:100%;max-width:400px;padding:2.5rem 2rem;
-  background:var(--s1);border:1px solid var(--s4);
-  border-radius:16px;text-align:center;
-  box-shadow:0 0 0 1px rgba(88,166,255,.08),
-             0 24px 60px rgba(0,0,0,.7),
-             0 0 80px rgba(31,111,235,.06);
+  width:860px;
+  display:grid;
+  grid-template-columns:1fr 320px;
+  border-radius:20px;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(88,166,255,.1),0 32px 80px rgba(0,0,0,.8);
   animation:slideup .4s cubic-bezier(.16,1,.3,1);
 }
-@keyframes slideup{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-.gate-gem{
-  width:58px;height:58px;border-radius:14px;
+.gate-left{
+  padding:3rem;background:#0d1117;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  border-right:1px solid #21262d;
+}
+.gate-left .gate-gem{
+  width:54px;height:54px;border-radius:13px;
   background:linear-gradient(135deg,#1f6feb,#8957e5);
   display:flex;align-items:center;justify-content:center;
-  font-size:1.6rem;margin:0 auto 1.2rem;
+  font-size:1.6rem;margin:0 auto 1rem;
   box-shadow:0 0 28px rgba(88,166,255,.25);
 }
-.gate-title{
+.gate-left .gate-title{
   font-family:'Syne',sans-serif;font-weight:900;
-  font-size:1.25rem;letter-spacing:-.3px;margin-bottom:.3rem;
+  font-size:1.4rem;color:#e6edf3;margin-bottom:.3rem;letter-spacing:-.3px;
 }
-.gate-sub{font-size:.7rem;color:var(--t2);margin-bottom:1.8rem;line-height:1.6}
-.gate-wrap{position:relative;margin-bottom:.75rem}
-#gate-inp{
-  width:100%;background:var(--s2);border:1px solid var(--s4);
-  border-radius:8px;color:var(--t1);
-  padding:.8rem 2.8rem .8rem 1rem;
-  font-size:1rem;font-family:inherit;text-align:center;
-  letter-spacing:.2em;transition:border-color .2s,box-shadow .2s;
+.gate-left .gate-sub{font-size:.72rem;color:#8b949e;margin-bottom:2rem}
+.google-btn{
+  width:100%;padding:12px 20px;border-radius:10px;
+  border:1px solid #30363d;background:#161b22;
+  color:#e6edf3;font-size:.85rem;font-weight:600;
+  cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:all .2s;box-shadow:0 1px 4px rgba(0,0,0,.4);
+  margin-bottom:.9rem;
 }
-#gate-inp:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(31,111,235,.12)}
-#gate-inp.shake{animation:shake .35s ease}
-@keyframes shake{0%,100%{transform:translateX(0)}25%,75%{transform:translateX(-7px)}50%{transform:translateX(7px)}}
-#gate-eye{
-  position:absolute;right:12px;top:50%;transform:translateY(-50%);
-  background:none;border:none;color:var(--t3);cursor:pointer;font-size:.9rem;padding:0;
+.google-btn:hover{background:#1c2128;border-color:#388bfd;box-shadow:0 0 0 3px rgba(56,139,253,.1)}
+.gate-divider{
+  display:flex;align-items:center;gap:10px;width:100%;
+  margin:.2rem 0 1rem;color:#484f58;font-size:.68rem;letter-spacing:.5px;
 }
-#gate-btn{
-  width:100%;
-  background:linear-gradient(135deg,var(--blue2),#8957e5);
-  color:#fff;border:none;border-radius:8px;padding:.85rem;
-  font-size:.85rem;font-weight:800;cursor:pointer;
-  font-family:'Syne',sans-serif;letter-spacing:.3px;
-  transition:all .2s;
-  box-shadow:0 4px 20px rgba(31,111,235,.25);
-  margin-bottom:.75rem;
+.gate-divider::before,.gate-divider::after{content:'';flex:1;height:1px;background:#21262d}
+.gate-input{
+  width:100%;padding:11px 14px;border-radius:10px;
+  border:1px solid #30363d;background:#161b22;
+  color:#e6edf3;font-size:.85rem;font-family:inherit;
+  box-sizing:border-box;margin-bottom:.75rem;
+  transition:border-color .2s,box-shadow .2s;
 }
-#gate-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(56,139,253,.4)}
-#gate-err{font-size:.7rem;color:var(--red);min-height:1.1rem;transition:opacity .2s}
-.gate-foot{
-  margin-top:1.4rem;padding-top:1rem;
-  border-top:1px solid var(--s4);
-  font-size:.6rem;color:var(--t3);line-height:1.8;
+.gate-input::placeholder{color:#484f58}
+.gate-input:focus{outline:none;border-color:#388bfd;box-shadow:0 0 0 3px rgba(56,139,253,.1)}
+.gate-submit{
+  width:100%;padding:12px;border-radius:10px;border:none;
+  background:linear-gradient(135deg,#1f6feb,#8957e5);
+  color:#fff;font-size:.88rem;font-weight:800;
+  cursor:pointer;font-family:inherit;transition:all .2s;
+  box-shadow:0 4px 16px rgba(31,111,235,.3);letter-spacing:.2px;
 }
-
+.gate-submit:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(31,111,235,.45)}
+.gate-link{
+  background:none;border:none;color:#388bfd;font-size:.72rem;
+  cursor:pointer;font-family:inherit;padding:0;text-decoration:none;transition:opacity .15s;
+}
+.gate-link:hover{opacity:.75;text-decoration:underline}
+.gate-msg{font-size:.72rem;min-height:1.1rem;margin:.5rem 0;text-align:center;width:100%}
+.gate-msg.err{color:#f85149}
+.gate-msg.ok{color:#3fb950}
+.gate-right{
+  background:linear-gradient(160deg,#1a3a6e 0%,#2a1a6e 55%,#15093a 100%);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:2.5rem 1.75rem;text-align:center;position:relative;overflow:hidden;
+}
+.gate-right::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 25%,rgba(88,166,255,.15) 0%,transparent 65%);
+}
+.gate-right-glyph{font-size:3.5rem;margin-bottom:1.2rem;position:relative;z-index:1;filter:drop-shadow(0 0 16px rgba(88,166,255,.35))}
+.gate-right-title{
+  font-family:'Syne',sans-serif;font-weight:900;
+  font-size:1.3rem;color:#e6edf3;margin-bottom:.65rem;
+  line-height:1.25;position:relative;z-index:1;
+}
+.gate-right-sub{font-size:.75rem;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:1.5rem;position:relative;z-index:1}
+.gate-right-stats{display:flex;flex-direction:column;gap:.5rem;width:100%;position:relative;z-index:1}
+.gate-stat{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);
+  border-radius:8px;padding:.55rem .85rem;
+  display:flex;align-items:center;gap:8px;
+  font-size:.72rem;color:rgba(255,255,255,.65);text-align:left;
+}
+.gate-foot{margin-top:1.5rem;font-size:.6rem;color:rgba(255,255,255,.25);position:relative;z-index:1}
+.auth-tabs{display:flex;width:100%;margin-bottom:1.5rem;border-radius:8px;overflow:hidden;border:1px solid #30363d;background:#161b22}
+.auth-tab{flex:1;padding:9px;font-size:.78rem;font-weight:700;cursor:pointer;background:transparent;color:#8b949e;border:none;font-family:inherit;transition:all .2s}
+.auth-tab.active{background:linear-gradient(135deg,#1f6feb,#8957e5);color:#fff}
+@media(max-width:700px){
+  .gate-box{width:100%;max-width:440px;grid-template-columns:1fr}
+  .gate-right{display:none}
+  .gate-left{padding:2.5rem 2rem}
+}
 
 /* ─── Grid noise texture overlay ─── */
 body::after{
@@ -813,19 +860,34 @@ var analysesUsed    = 0;
 var analysesLimit   = 3;
 
 // ── Auth tab switching ────────────────────────────────────────
-function switchAuthTab(tab) {
-  document.querySelectorAll('.auth-tab').forEach(function(t, i) {
-    t.classList.toggle('active', (i === 0 && tab === 'signin') || (i === 1 && tab === 'signup'));
+function switchAuthTab(tab) {}  // legacy — not used in split design
+
+function switchToSignIn() {
+  document.getElementById('auth-signup-form').style.display = 'none';
+  document.getElementById('auth-forgot-form').style.display = 'none';
+  // Show main form
+  document.getElementById('auth-email').closest('div') && null;
+  ['auth-email','auth-password'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.closest && (el.style.display = '');
   });
-  document.getElementById('auth-signin-form').style.display  = tab === 'signin'  ? 'block' : 'none';
-  document.getElementById('auth-signup-form').style.display  = tab === 'signup'  ? 'block' : 'none';
-  document.getElementById('auth-forgot-form').style.display  = 'none';
+  // Re-show main sign in button and links
+  var btn = document.querySelector('.gate-submit');
+  if (btn) btn.style.display = '';
+  var links = document.querySelector('#gate .gate-left > div[style*="justify-content"]');
+  if (links) links.style.display = '';
+  document.getElementById('auth-msg').textContent = '';
+}
+
+function switchToSignUp() {
+  document.getElementById('auth-signup-form').style.display = 'block';
+  document.getElementById('auth-forgot-form').style.display = 'none';
   document.getElementById('auth-msg').textContent = '';
 }
 
 function showForgotPassword() {
-  document.getElementById('auth-signin-form').style.display = 'none';
   document.getElementById('auth-forgot-form').style.display = 'block';
+  document.getElementById('auth-signup-form').style.display = 'none';
   document.getElementById('auth-msg').textContent = '';
 }
 
@@ -1043,61 +1105,100 @@ function toggleGateEye() {}
 <!-- ══ PASSWORD GATE ══ -->
 <div id="gate">
   <div class="gate-box">
-    <div class="gate-gem">🔬</div>
-    <div class="gate-title">CoreDumpAnalyzer</div>
-    <div class="gate-sub">AI-Powered Core Dump Analysis &amp; Auto-Fix Engine</div>
 
-    <!-- Auth tabs -->
-    <div class="auth-tabs">
-      <button class="auth-tab active" onclick="switchAuthTab('signin')">Sign In</button>
-      <button class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</button>
-    </div>
+    <!-- LEFT: Form -->
+    <div class="gate-left">
+      <div class="gate-gem">🔬</div>
+      <div class="gate-title">CoreDumpAnalyzer</div>
+      <div class="gate-sub">Sign in to your account</div>
 
-    <!-- Google Sign In -->
-    <button class="google-btn" onclick="signInWithGoogle()">
-      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg>
-      Continue with Google
-    </button>
+      <!-- Google only -->
+      <button class="google-btn" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+          <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+          <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18z"/>
+          <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
+        </svg>
+        Continue with Google
+      </button>
 
-    <div class="auth-divider">or</div>
+      <div class="gate-divider">or sign in with email</div>
 
-    <!-- Email/Password form -->
-    <div id="auth-signin-form">
-      <input type="email" id="auth-email" class="gate-input" placeholder="your@email.com" autocomplete="email">
-      <input type="password" id="auth-password" class="gate-input" placeholder="Password"
-        autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()">
-      <div style="text-align:right;margin-bottom:.75rem">
+      <!-- Email/Password -->
+      <input type="email" id="auth-email" class="gate-input"
+        placeholder="your@email.com" autocomplete="email">
+      <input type="password" id="auth-password" class="gate-input"
+        placeholder="Password" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')doSignIn()">
+
+      <div style="width:100%;max-width:340px;display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">
+        <button class="gate-link" onclick="switchToSignUp()">New user? Sign up</button>
         <button class="gate-link" onclick="showForgotPassword()">Forgot password?</button>
       </div>
+
       <button class="gate-submit" onclick="doSignIn()">Sign In</button>
-    </div>
 
-    <div id="auth-signup-form" style="display:none">
-      <input type="email" id="auth-signup-email" class="gate-input" placeholder="your@email.com" autocomplete="email">
-      <input type="password" id="auth-signup-password" class="gate-input" placeholder="Password (min 6 chars)"
-        autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignUp()">
-      <button class="gate-submit" onclick="doSignUp()">Create Free Account</button>
-      <div style="margin-top:.75rem;font-size:.68rem;color:var(--t3);text-align:center">
-        Free tier includes 3 analyses — no card required
+      <!-- Sign up form (hidden by default) -->
+      <div id="auth-signup-form" style="display:none;width:100%;max-width:340px">
+        <input type="email" id="auth-signup-email" class="gate-input"
+          placeholder="your@email.com" autocomplete="email">
+        <input type="password" id="auth-signup-password" class="gate-input"
+          placeholder="Password (min 6 chars)" autocomplete="new-password"
+          onkeydown="if(event.key==='Enter')doSignUp()">
+        <button class="gate-submit" onclick="doSignUp()">Create Free Account</button>
+        <div style="margin-top:.75rem;font-size:.68rem;color:#8b949e;text-align:center">
+          3 free analyses — no card required
+        </div>
+        <div style="margin-top:.75rem;text-align:center">
+          <button class="gate-link" onclick="switchToSignIn()">Already have an account?</button>
+        </div>
       </div>
-    </div>
 
-    <div id="auth-forgot-form" style="display:none">
-      <div style="font-size:.8rem;color:var(--t2);margin-bottom:1rem">
-        Enter your email and we'll send a reset link.
+      <!-- Forgot password form (hidden) -->
+      <div id="auth-forgot-form" style="display:none;width:100%;max-width:340px">
+        <div style="font-size:.8rem;color:#8b949e;margin-bottom:1rem;text-align:center">
+          Enter your email to receive a reset link
+        </div>
+        <input type="email" id="auth-reset-email" class="gate-input" placeholder="your@email.com">
+        <button class="gate-submit" onclick="doForgotPassword()">Send Reset Link</button>
+        <div style="margin-top:.75rem;text-align:center">
+          <button class="gate-link" onclick="switchToSignIn()">← Back to sign in</button>
+        </div>
       </div>
-      <input type="email" id="auth-reset-email" class="gate-input" placeholder="your@email.com">
-      <button class="gate-submit" onclick="doForgotPassword()">Send Reset Link</button>
-      <div style="text-align:center;margin-top:.75rem">
-        <button class="gate-link" onclick="switchAuthTab('signin')">← Back to sign in</button>
+
+      <div id="auth-msg" class="gate-msg"></div>
+    </div>
+
+    <!-- RIGHT: Branding -->
+    <div class="gate-right">
+      <div class="gate-right-glyph">🔬</div>
+      <div class="gate-right-title">AI-Powered<br>Crash Analysis</div>
+      <div class="gate-right-sub">
+        Paste a GDB core dump and get the root cause,<br>
+        fix, and JIRA-ready RCA in under 30 seconds.
       </div>
+      <div class="gate-right-stats">
+        <div class="gate-stat">
+          <span class="gate-stat-icon">⚡</span>
+          30 second AI analysis
+        </div>
+        <div class="gate-stat">
+          <span class="gate-stat-icon">🔧</span>
+          Auto-generated code fix
+        </div>
+        <div class="gate-stat">
+          <span class="gate-stat-icon">📄</span>
+          One-click RCA PDF for JIRA
+        </div>
+        <div class="gate-stat">
+          <span class="gate-stat-icon">🧠</span>
+          Learns from every crash
+        </div>
+      </div>
+      <div class="gate-foot">Developed by Devendra Pillay © 2026</div>
     </div>
 
-    <div id="auth-msg" class="gate-msg"></div>
-
-    <div class="gate-foot">
-      Developed by Devendra Pillay &copy; 2026
-    </div>
   </div>
 </div>
 
