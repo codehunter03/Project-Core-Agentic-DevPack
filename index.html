@@ -1142,18 +1142,18 @@ async function onAuthSuccess(user) {
   var gate = document.getElementById('gate');
   if (gate) { gate.className = 'hidden'; gate.style.display = 'none'; }
 
-  // Load user plan from our users table
-  await loadUserPlan(user.id);
-  // Store session indicator
-  sessionStorage.setItem('cda_logged_in', '1');
-  // Store user email for display on fast reload
-  try { localStorage.setItem('cda_user_email', user.email || ''); } catch(e) {}
-
   // Set team token for Lambda
   localStorage.setItem('devpack_team_token', 'DevPackTeam2024!');
 
-  // Update header badge
+  // Update header badge (creates pill element)
   updateUserBadge(user.email);
+
+  // Load plan from Supabase THEN update pill with real data
+  await loadUserPlan(user.id);
+
+  // Store session info
+  sessionStorage.setItem('cda_logged_in', '1');
+  try { localStorage.setItem('cda_user_email', user.email || ''); } catch(e) {}
 }
 
 // ── Load user plan ────────────────────────────────────────────
@@ -1166,16 +1166,35 @@ async function loadUserPlan(userId) {
       .single();
 
     if (data) {
-      currentPlan    = data.plan           || 'free';
-      analysesUsed   = data.analyses_used  || 0;
-      analysesLimit  = data.analyses_limit || 3;
+      currentPlan   = data.plan           || 'free';
+      analysesUsed  = data.analyses_used  || 0;
+      analysesLimit = data.analyses_limit || 3;
+    } else {
+      // No user row — create one now
+      console.log('[CDA] Creating user record...');
+      await supa.from('users').upsert({
+        id:              userId,
+        email:           currentUser?.email || '',
+        plan:            'free',
+        analyses_used:   0,
+        analyses_limit:  3,
+      }, { onConflict: 'id' });
+      currentPlan   = 'free';
+      analysesUsed  = 0;
+      analysesLimit = 3;
     }
   } catch(e) {
-    console.log('Could not load plan:', e);
+    console.log('[CDA] Could not load plan:', e.message);
+    // Use safe defaults
+    currentPlan   = 'free';
+    analysesUsed  = 0;
+    analysesLimit = 3;
   }
-  // Always update pill after loading data
+
+  // Always update pill with real data
   updateUsagePill();
-  // If already at limit on load — lock the tool immediately
+
+  // Lock tool if already at limit
   if (currentPlan !== 'pro' && analysesUsed >= analysesLimit) {
     lockToolForUpgrade();
   }
@@ -1192,16 +1211,17 @@ function updateUserBadge(email) {
     badge.style.background  = 'rgba(35,134,54,.1)';
   }
 
-  // Show usage counter in header
-  var pill = document.getElementById('usage-pill');
-  if (!pill) {
-    pill = document.createElement('span');
+  // Show usage counter in header — just create element, loadUserPlan fills it
+  if (!document.getElementById('usage-pill')) {
+    var pill = document.createElement('span');
     pill.id = 'usage-pill';
     pill.className = 'pill';
+    pill.textContent = '...';
+    pill.style.color = '#8b949e';
     var badges = document.querySelector('.hbadges');
     if (badges) badges.insertBefore(pill, badges.firstChild);
   }
-  updateUsagePill();
+  // Don't call updateUsagePill here — loadUserPlan does it with real data
 }
 
 function updateUsagePill() {
