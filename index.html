@@ -1166,12 +1166,18 @@ async function loadUserPlan(userId) {
       .single();
 
     if (data) {
-      currentPlan    = data.plan          || 'free';
-      analysesUsed   = data.analyses_used || 0;
+      currentPlan    = data.plan           || 'free';
+      analysesUsed   = data.analyses_used  || 0;
       analysesLimit  = data.analyses_limit || 3;
     }
   } catch(e) {
     console.log('Could not load plan:', e);
+  }
+  // Always update pill after loading data
+  updateUsagePill();
+  // If already at limit on load — lock the tool immediately
+  if (currentPlan !== 'pro' && analysesUsed >= analysesLimit) {
+    lockToolForUpgrade();
   }
 }
 
@@ -1221,9 +1227,9 @@ function updateUsagePill() {
 
 // ── Check limit before analysis ───────────────────────────────
 function checkAnalysisLimit() {
-  if (currentPlan === 'pro') return true;  // unlimited
+  if (currentPlan === 'pro') return true;
   if (analysesUsed >= analysesLimit) {
-    showUpgradeModal();
+    showUpgradeModal(true); // locked — no dismiss
     return false;
   }
   return true;
@@ -1242,22 +1248,69 @@ async function incrementUsage() {
       .eq('id', currentUser.id);
   } catch(e) {}
 
-  // Update pill to show limit reached
+  // If just hit the limit — show locked modal after delay
   if (analysesUsed >= analysesLimit) {
     updateUsagePill();
-    // Show upgrade modal after short delay so they can see the result first
     setTimeout(function() {
-      if (analysesUsed >= analysesLimit) showUpgradeModal();
+      if (analysesUsed >= analysesLimit && currentPlan !== 'pro') {
+        showUpgradeModal(true); // locked
+      }
     }, 3000);
   }
 }
 
 // ── Upgrade modal ─────────────────────────────────────────────
-function showUpgradeModal() {
-  document.getElementById('upgrade-modal').classList.add('show');
+function showUpgradeModal(locked) {
+  var modal   = document.getElementById('upgrade-modal');
+  var skipBtn = document.getElementById('upgrade-skip-btn');
+  var subText = document.getElementById('upgrade-sub-text');
+  modal.classList.add('show');
+  if (locked) {
+    if (skipBtn) skipBtn.style.display = 'none';
+    if (subText) subText.textContent   = 'You have used all 3 free analyses. Subscribe to continue.';
+  } else {
+    if (skipBtn) skipBtn.style.display = 'block';
+    if (subText) subText.textContent   = "You've used all 3 free analyses";
+  }
 }
 function closeUpgradeModal() {
+  if (currentPlan !== 'pro' && analysesUsed >= analysesLimit) {
+    // Can't close — lock the tool instead
+    document.getElementById('upgrade-modal').classList.remove('show');
+    lockToolForUpgrade();
+    return;
+  }
   document.getElementById('upgrade-modal').classList.remove('show');
+}
+function lockToolForUpgrade() {
+  // Disable run button
+  var runBtn = document.getElementById('run-btn');
+  if (runBtn) {
+    runBtn.disabled        = true;
+    runBtn.textContent     = '🔒 Upgrade to Analyze';
+    runBtn.onclick         = function() { showUpgradeModal(true); };
+    runBtn.style.background = '#21262d';
+    runBtn.style.color      = '#8b949e';
+    runBtn.style.cursor     = 'pointer';
+  }
+  // Show persistent bottom banner
+  if (!document.getElementById('upgrade-banner')) {
+    var banner = document.createElement('div');
+    banner.id = 'upgrade-banner';
+    banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;' +
+      'background:linear-gradient(135deg,#1f3c6e,#2d1f6e);' +
+      'border-top:1px solid rgba(88,166,255,.2);' +
+      'padding:.75rem 1.5rem;display:flex;align-items:center;' +
+      'justify-content:space-between;gap:1rem;flex-wrap:wrap;';
+    banner.innerHTML =
+      '<span style="color:#e6edf3;font-size:.85rem;font-weight:600">' +
+      '🔒 You\'ve used all 3 free analyses — upgrade to continue</span>' +
+      '<button onclick="showUpgradeModal(true)" style="background:linear-gradient(135deg,#1f6feb,#8957e5);' +
+      'border:none;color:#fff;border-radius:8px;padding:8px 20px;' +
+      'font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">' +
+      '⚡ Upgrade — $9.99/month</button>';
+    document.body.appendChild(banner);
+  }
 }
 
 // ── Stripe checkout ───────────────────────────────────────────
@@ -1373,7 +1426,7 @@ function toggleGateEye() {}
     <div class="upgrade-header">
       <span class="upgrade-icon">🚀</span>
       <div class="upgrade-title">Upgrade to Pro</div>
-      <div class="upgrade-sub">You've used all 3 free analyses</div>
+      <div class="upgrade-sub" id="upgrade-sub-text">You've used all 3 free analyses</div>
     </div>
     <div class="upgrade-body">
       <div class="upgrade-price">$9.99<span>/month</span></div>
@@ -1386,7 +1439,7 @@ function toggleGateEye() {}
         <li>Priority support</li>
       </ul>
       <button class="upgrade-btn" onclick="goToCheckout()">Upgrade Now — $9.99/month</button>
-      <button class="upgrade-skip" onclick="closeUpgradeModal()">Maybe later</button>
+      <button class="upgrade-skip" id="upgrade-skip-btn" onclick="closeUpgradeModal()">Maybe later</button>
     </div>
     <div class="free-bar">🔒 Secured by Stripe &nbsp;·&nbsp; Cancel anytime</div>
   </div>
