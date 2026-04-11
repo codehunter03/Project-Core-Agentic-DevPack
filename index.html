@@ -324,16 +324,55 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 .cl-c{color:var(--t1);padding-right:1rem;white-space:pre}
 
 /* ─── DIFF ─── */
-.dl{display:flex;font-size:.7rem;border-left:3px solid transparent}
-.dl.add{background:rgba(86,211,100,.07);border-left-color:var(--green)}
-.dl.rem{background:rgba(218,54,51,.07);border-left-color:var(--red2)}
-.dl-m{min-width:1.4rem;color:var(--t3);padding:0 4px;user-select:none;flex-shrink:0}
-.dl.add .dl-m{color:var(--green)}
-.dl.rem .dl-m{color:var(--red)}
-.dl-n{min-width:2.8rem;color:var(--t3);padding:0 6px;user-select:none;text-align:right;flex-shrink:0}
-.dl-c{color:var(--t1);white-space:pre;padding-right:1rem}
-.dl.add .dl-c{color:var(--green)}
-.dl.rem .dl-c{color:var(--red)}
+/* ── Git-style diff ── */
+.diff-wrap{font-family:'JetBrains Mono',Consolas,monospace;font-size:.72rem;border-radius:6px;overflow:hidden;border:1px solid var(--s4)}
+.diff-file-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.45rem .9rem;background:#161b22;border-bottom:1px solid var(--s4);
+  font-size:.68rem;color:var(--t2);
+}
+.diff-file-name{color:var(--t1);font-weight:600;font-family:inherit}
+.diff-copy-btn{
+  background:none;border:1px solid var(--s5);color:var(--t3);
+  border-radius:4px;padding:2px 10px;font-size:.62rem;cursor:pointer;
+  font-family:inherit;transition:all .15s;
+}
+.diff-copy-btn:hover{color:var(--blue);border-color:var(--blue2)}
+.diff-hunk{
+  display:flex;padding:3px 0;
+  background:rgba(88,166,255,.08);border-top:1px solid var(--s4);
+  border-bottom:1px solid var(--s4);color:#58a6ff;
+  font-size:.68rem;white-space:pre;
+}
+.diff-hunk-text{padding:0 .9rem}
+.dl{display:flex;font-size:.72rem;line-height:1.5;min-height:1.35rem}
+.dl.add{background:rgba(46,160,67,.15)}
+.dl.rem{background:rgba(248,81,73,.15)}
+.dl.ctx{background:transparent}
+.dl-lnum{
+  min-width:2.4rem;padding:0 .5rem;text-align:right;
+  color:var(--t3);user-select:none;flex-shrink:0;
+  border-right:1px solid var(--s4);font-size:.65rem;
+}
+.dl-lnum.old{min-width:2.4rem;border-right:none}
+.dl-lnum.new{min-width:2.4rem;border-right:1px solid var(--s4)}
+.dl-nums{display:flex;flex-shrink:0;border-right:1px solid var(--s4)}
+.dl-sign{
+  min-width:1.2rem;padding:0 .2rem;text-align:center;
+  user-select:none;flex-shrink:0;font-weight:700;
+}
+.dl.add .dl-sign{color:#3fb950;background:rgba(46,160,67,.2)}
+.dl.rem .dl-sign{color:#f85149;background:rgba(248,81,73,.2)}
+.dl.ctx .dl-sign{color:var(--t3)}
+.dl-c{
+  padding:0 .5rem;white-space:pre;overflow:hidden;
+  text-overflow:ellipsis;color:var(--t1);flex:1;
+}
+.dl.add .dl-c{color:#aff5b4}
+.dl.rem .dl-c{color:#ffa198}
+/* keep old .dl-m and .dl-n for mobile compat */
+.dl-m{display:none}
+.dl-n{display:none}
 
 /* ─── CARDS ─── */
 .card{background:var(--s2);border:1px solid var(--s4);border-radius:6px;padding:.9rem;font-size:.78rem;line-height:1.75;color:var(--t1)}
@@ -1341,24 +1380,170 @@ function renderCode(el, code, hl) {
 // ══════════════════════════════════════════════
 //  DIFF RENDERER
 // ══════════════════════════════════════════════
+function computeDiff(origLines, fixedLines) {
+  // Simple LCS-based diff
+  var m = origLines.length, n = fixedLines.length;
+  var dp = Array.from({length: m+1}, function() { return new Array(n+1).fill(0); });
+  for (var ii = m-1; ii >= 0; ii--) {
+    for (var jj = n-1; jj >= 0; jj--) {
+      if (origLines[ii] === fixedLines[jj]) dp[ii][jj] = dp[ii+1][jj+1] + 1;
+      else dp[ii][jj] = Math.max(dp[ii+1][jj], dp[ii][jj+1]);
+    }
+  }
+  var hunks = [], ii = 0, jj = 0;
+  while (ii < m || jj < n) {
+    if (ii < m && jj < n && origLines[ii] === fixedLines[jj]) {
+      hunks.push({ t: 'ctx', old: ii+1, new: jj+1, l: origLines[ii] });
+      ii++; jj++;
+    } else if (jj >= n || (ii < m && dp[ii+1][jj] >= dp[ii][jj+1])) {
+      hunks.push({ t: 'rem', old: ii+1, new: null, l: origLines[ii] });
+      ii++;
+    } else {
+      hunks.push({ t: 'add', old: null, new: jj+1, l: fixedLines[jj] });
+      jj++;
+    }
+  }
+  return hunks;
+}
+
 function renderDiff(el, orig, fixed) {
   el.innerHTML = '';
-  if(!orig||!fixed){el.textContent='No diff.';return;}
-  const oL=orig.split('\n'), fL=fixed.split('\n'), H=[];
-  let i=0,j=0;
-  while(i<oL.length||j<fL.length){
-    if(oL[i]===fL[j]){H.push({t:'s',l:oL[i],n:i+1});i++;j++;}
-    else if(j>=fL.length||i<oL.length){H.push({t:'r',l:oL[i]||'',n:i+1});i++;}
-    else{H.push({t:'a',l:fL[j]||'',n:j+1});j++;}
+  if (!orig || !fixed) { el.textContent = 'No diff available.'; return; }
+
+  var origLines  = orig.split('\n');
+  var fixedLines = fixed.split('\n');
+  var hunks      = computeDiff(origLines, fixedLines);
+  var changed    = hunks.filter(function(h) { return h.t !== 'ctx'; });
+
+  if (!changed.length) {
+    el.innerHTML = '<div style="padding:1rem;color:var(--t3);font-size:.75rem">✅ No differences detected — files are identical.</div>';
+    return;
   }
-  const ch=H.filter(h=>h.t!=='s');
-  if(!ch.length){el.textContent='No changes detected.';return;}
-  H.filter(h=>h.t!=='s'||ch.some(c=>Math.abs(c.n-h.n)<=3)).forEach(h=>{
-    const d=document.createElement('div');
-    d.className='dl '+(h.t==='a'?'add':h.t==='r'?'rem':'');
-    const m=h.t==='a'?'+':h.t==='r'?'−':' ';
-    d.innerHTML=`<span class="dl-m">${m}</span><span class="dl-n">${h.n}</span><span class="dl-c">${esc(h.l)}</span>`;
-    el.appendChild(d);
+
+  // Count stats
+  var adds = hunks.filter(function(h) { return h.t === 'add'; }).length;
+  var rems = hunks.filter(function(h) { return h.t === 'rem'; }).length;
+
+  // Build visible hunks — context window of 3 around each change
+  var CONTEXT = 3;
+  var visible  = new Set();
+  changed.forEach(function(ch) {
+    var idx = hunks.indexOf(ch);
+    for (var k = Math.max(0, idx-CONTEXT); k <= Math.min(hunks.length-1, idx+CONTEXT); k++) {
+      visible.add(k);
+    }
+  });
+
+  // Build diff wrapper
+  var wrap = document.createElement('div');
+  wrap.className = 'diff-wrap';
+
+  // File header
+  var header = document.createElement('div');
+  header.className = 'diff-file-header';
+  header.innerHTML =
+    '<span class="diff-file-name">📄 ' + esc(curFname || 'source.cpp') + '</span>' +
+    '<span style="display:flex;align-items:center;gap:12px">' +
+    '<span style="color:#3fb950;font-weight:600">+' + adds + '</span>' +
+    '<span style="color:#f85149;font-weight:600">−' + rems + '</span>' +
+    '<button class="diff-copy-btn" onclick="copyDiff()">⎘ Copy patch</button>' +
+    '</span>';
+  wrap.appendChild(header);
+
+  // Render hunks with hunk headers
+  var prevIdx    = -999;
+  var hunkOldStart = 1, hunkNewStart = 1;
+
+  Array.from(visible).sort(function(a,b){return a-b;}).forEach(function(idx) {
+    var h = hunks[idx];
+
+    // Insert hunk header if gap
+    if (idx > prevIdx + 1) {
+      var oldStart = h.old || (hunks[idx-1] && hunks[idx-1].old ? hunks[idx-1].old+1 : 1);
+      var newStart = h.new || (hunks[idx-1] && hunks[idx-1].new ? hunks[idx-1].new+1 : 1);
+
+      // Count how many lines in this visible group
+      var groupEnd = idx;
+      while (groupEnd+1 < hunks.length && visible.has(groupEnd+1)) groupEnd++;
+      var oldCount = 0, newCount = 0;
+      for (var k = idx; k <= groupEnd; k++) {
+        if (hunks[k].t !== 'add') oldCount++;
+        if (hunks[k].t !== 'rem') newCount++;
+      }
+
+      var hunkDiv = document.createElement('div');
+      hunkDiv.className = 'diff-hunk';
+      hunkDiv.innerHTML = '<span class="diff-hunk-text">@@ -' + oldStart + ',' + oldCount + ' +' + (newStart || oldStart) + ',' + newCount + ' @@</span>';
+      wrap.appendChild(hunkDiv);
+    }
+    prevIdx = idx;
+
+    // Build diff line
+    var row = document.createElement('div');
+    row.className = 'dl ' + (h.t === 'add' ? 'add' : h.t === 'rem' ? 'rem' : 'ctx');
+
+    var numsDiv = document.createElement('div');
+    numsDiv.className = 'dl-nums';
+
+    var oldNum = document.createElement('span');
+    oldNum.className = 'dl-lnum old';
+    oldNum.textContent = h.t !== 'add' ? String(h.old) : '';
+
+    var newNum = document.createElement('span');
+    newNum.className = 'dl-lnum new';
+    newNum.textContent = h.t !== 'rem' ? String(h.new) : '';
+
+    numsDiv.appendChild(oldNum);
+    numsDiv.appendChild(newNum);
+
+    var sign = document.createElement('span');
+    sign.className = 'dl-sign';
+    sign.textContent = h.t === 'add' ? '+' : h.t === 'rem' ? '-' : ' ';
+
+    var code = document.createElement('span');
+    code.className = 'dl-c';
+    code.textContent = h.l;
+
+    row.appendChild(numsDiv);
+    row.appendChild(sign);
+    row.appendChild(code);
+    wrap.appendChild(row);
+  });
+
+  el.appendChild(wrap);
+
+  // Store patch text for copy
+  el._patchText = generatePatch(origLines, fixedLines, hunks, visible, curFname || 'source.cpp');
+}
+
+function generatePatch(origLines, fixedLines, hunks, visible, fname) {
+  var lines = ['--- a/' + fname, '+++ b/' + fname];
+  var prevIdx = -999;
+  var group = [];
+
+  Array.from(visible).sort(function(a,b){return a-b;}).forEach(function(idx) {
+    if (idx > prevIdx + 1 && group.length) {
+      lines = lines.concat(group);
+      group = [];
+    }
+    var h = hunks[idx];
+    if (idx > prevIdx + 1) {
+      var oldS = h.old || 1, newS = h.new || 1;
+      group.push('@@ -' + oldS + ' +' + (newS||oldS) + ' @@');
+    }
+    prevIdx = idx;
+    group.push((h.t === 'add' ? '+' : h.t === 'rem' ? '-' : ' ') + h.l);
+  });
+  if (group.length) lines = lines.concat(group);
+  return lines.join('\n');
+}
+
+function copyDiff() {
+  var el = document.getElementById('r-diff');
+  if (!el || !el._patchText) return;
+  navigator.clipboard.writeText(el._patchText).then(function() {
+    var btn = el.querySelector('.diff-copy-btn');
+    if (btn) { btn.textContent = '✅ Copied!'; setTimeout(function(){ btn.textContent = '⎘ Copy patch'; }, 2000); }
   });
 }
 
