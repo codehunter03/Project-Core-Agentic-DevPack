@@ -948,78 +948,85 @@ async function initSupabase() {
       autoRefreshToken:   true,
       persistSession:     true,
       detectSessionInUrl: true,
-      storageKey:         'cda-auth',
+      storageKey:         'cda-auth-v1',
       storage:            window.localStorage,
     }
   });
 
-  // Handle auth state — catches OAuth redirect callback
+  // Listen for auth events
   supa.auth.onAuthStateChange(async function(event, session) {
-    console.log('[CDA Auth] Event:', event, '| User:', session?.user?.email || 'none');
-    if (event === 'SIGNED_IN' && session?.user) {
-      // Only handle if not already logged in (prevents double-call)
-      if (!currentUser) {
-        await onAuthSuccess(session.user);
-      }
+    console.log('[CDA Auth]', event, session?.user?.email || 'no user');
+
+    if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+      // Manually persist session for reliable restore on refresh
+      try {
+        localStorage.setItem('cda-session', JSON.stringify({
+          access_token:  session.access_token,
+          refresh_token: session.refresh_token,
+          expires_at:    session.expires_at,
+          user:          { id: session.user.id, email: session.user.email }
+        }));
+      } catch(e) {}
+      if (!currentUser) await onAuthSuccess(session.user);
     }
+
     if (event === 'SIGNED_OUT') {
       currentUser = null;
+      localStorage.removeItem('cda-session');
       sessionStorage.removeItem('cda_logged_in');
       var gate = document.getElementById('gate');
       if (gate) gate.className = '';
     }
-    if (event === 'TOKEN_REFRESHED' && session?.user && !currentUser) {
-      await onAuthSuccess(session.user);
-    }
   });
 
-  // Check for existing session with timeout fallback
-  var sessionCheckDone = false;
-  var sessionTimeout = setTimeout(function() {
-    if (!sessionCheckDone) {
-      console.log('[CDA Auth] Session check timed out — showing login');
-      var gate = document.getElementById('gate');
-      if (gate) gate.className = '';
-    }
-  }, 3000);
-
+  // Try to restore session from our manual backup first
+  var gate = document.getElementById('gate');
   try {
-    // Debug: show what's in localStorage
-    var lsKeys = Object.keys(localStorage).filter(function(k){ return k.includes('supabase'); });
-    console.log('[CDA Auth] Supabase localStorage keys:', lsKeys);
-
-    const { data: sessionData, error: sessionError } = await supa.auth.getSession();
-    sessionCheckDone = true;
-    clearTimeout(sessionTimeout);
-
-    console.log('[CDA Auth] getSession result:', {
-      user: sessionData?.session?.user?.email || 'none',
-      expires: sessionData?.session?.expires_at,
-      error: sessionError?.message || 'none'
-    });
-
-    if (sessionData?.session?.user) {
-      await onAuthSuccess(sessionData.session.user);
-    } else {
-      // Try refreshing the session before giving up
-      console.log('[CDA Auth] No session — trying refresh...');
-      const { data: refreshData } = await supa.auth.refreshSession();
-      if (refreshData?.session?.user) {
-        console.log('[CDA Auth] Refresh succeeded:', refreshData.session.user.email);
-        await onAuthSuccess(refreshData.session.user);
-      } else {
-        console.log('[CDA Auth] No session after refresh — showing login');
-        var gate = document.getElementById('gate');
-        if (gate) gate.className = '';
+    var savedRaw = localStorage.getItem('cda-session');
+    if (savedRaw) {
+      var saved = JSON.parse(savedRaw);
+      // Check not expired (expires_at is Unix timestamp)
+      if (saved.access_token && saved.expires_at > Math.floor(Date.now()/1000)) {
+        console.log('[CDA Auth] Restoring saved session for', saved.user?.email);
+        // Set session in Supabase using saved tokens
+        const { data, error } = await supa.auth.setSession({
+          access_token:  saved.access_token,
+          refresh_token: saved.refresh_token,
+        });
+        if (data?.user) {
+          console.log('[CDA Auth] Session restored ✅');
+          await onAuthSuccess(data.user);
+          return;
+        }
+      } else if (saved.refresh_token) {
+        // Token expired — try refresh
+        console.log('[CDA Auth] Token expired — refreshing...');
+        const { data } = await supa.auth.refreshSession({ refresh_token: saved.refresh_token });
+        if (data?.user) {
+          console.log('[CDA Auth] Token refreshed ✅');
+          await onAuthSuccess(data.user);
+          return;
+        }
       }
     }
   } catch(e) {
-    sessionCheckDone = true;
-    clearTimeout(sessionTimeout);
-    console.error('[CDA Auth] Session check error:', e);
-    var gate = document.getElementById('gate');
-    if (gate) gate.className = '';
+    console.log('[CDA Auth] Session restore error:', e.message);
+    localStorage.removeItem('cda-session');
   }
+
+  // Fallback: check Supabase's own session
+  try {
+    const { data } = await supa.auth.getSession();
+    if (data?.session?.user) {
+      console.log('[CDA Auth] Supabase session found ✅');
+      await onAuthSuccess(data.session.user);
+      return;
+    }
+  } catch(e) {}
+
+  // No session — show login
+  console.log('[CDA Auth] No session — showing login');
+  if (gate) gate.className = '';
 }
 initSupabase();
 
@@ -1694,10 +1701,9 @@ let curResult = null, curOrig = '', curFname = 'source.cpp', curAnalysisId = nul
 // ══════════════════════════════════════════════
 //  API KEY MANAGEMENT
 // ══════════════════════════════════════════════
-function loadKey() {
-  const k = localStorage.getItem('devpack_api_key') || '';
-  document.getElementById('api-key-input').value = k;
-}
+function loadKey() {} // Removed
+
+
 function saveKey() {} // Removed — key handled server-side
 
 function setKeyStatus(msg, color) {
@@ -2906,15 +2912,13 @@ async function runSelfTest() {
   stRunning = false;
 }
 
-// Auto-run silently on page load when API key already saved
+// On page load
 window.addEventListener('load', function() {
-  var apiKey = localStorage.getItem('devpack_api_key') || '';
-  if (apiKey === 'server-managed' || (apiKey && (apiKey === 'server-managed' || apiKey.startsWith('sk-ant-')))) {
-    // Warm up Lambda immediately to eliminate cold start delay
-    setTimeout(warmLambda, 500);
-    // Self-test runs after warm-up
-    setTimeout(runSelfTest, 3000);
-  }
+  // Remove old API key from localStorage — now server-side only
+  try { localStorage.removeItem('devpack_api_key'); } catch(e) {}
+  // Warm Lambda and run self-test after auth completes
+  setTimeout(warmLambda, 2000);
+  setTimeout(runSelfTest, 5000);
 });
 
 // Keep Lambda warm — ping every 4 minutes (Lambda sleeps after 5 min)
