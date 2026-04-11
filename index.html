@@ -1324,7 +1324,9 @@ function closeUpgradeModal() {
   }
   document.getElementById('upgrade-modal').classList.remove('show');
 }
+var toolLocked = false;
 function lockToolForUpgrade() {
+  toolLocked = true;
   // If DOM not ready yet, wait for it
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() { lockToolForUpgrade(); });
@@ -1392,7 +1394,7 @@ function lockToolForUpgrade() {
     overlay.id = 'workspace-lock';
     overlay.onclick = function() { showUpgradeModal(true); };
     overlay.style.cssText = [
-      'position:fixed;inset:0;z-index:998',
+      'position:fixed;inset:0;z-index:99990',
       'cursor:pointer',
       'background:rgba(13,17,23,.7)',
       'backdrop-filter:blur(2px)',
@@ -2333,8 +2335,17 @@ function renderResult(r) {
 //  MAIN ANALYSIS
 // ══════════════════════════════════════════════
 async function runAnalysis() {
-  // Check usage limit before running
-  if (!checkAnalysisLimit()) return;
+  // Hard block if tool is locked
+  if (toolLocked) {
+    showUpgradeModal(true);
+    return;
+  }
+  // Check usage limit before running — always read from current state
+  if (currentPlan !== 'pro' && analysesUsed >= analysesLimit) {
+    lockToolForUpgrade();
+    showUpgradeModal(true);
+    return;
+  }
 
   // API key handled server-side — use user's stored key or placeholder
   const apiKey = 'server-managed';
@@ -2488,7 +2499,13 @@ async function runAnalysis() {
     showErr(err.message+hint);
     document.getElementById('empty').style.display='flex';
   } finally {
-    document.getElementById('run-btn').disabled=false;
+    // Only re-enable run button if user still has analyses left
+    if (currentPlan === 'pro' || analysesUsed < analysesLimit) {
+      document.getElementById('run-btn').disabled=false;
+    } else {
+      // Re-lock in case analysis just used last credit
+      setTimeout(lockToolForUpgrade, 500);
+    }
     document.getElementById('prog').style.display='none';
   }
 }
