@@ -1196,10 +1196,16 @@ async function loadUserPlan(userId) {
   // Always update pill with real data
   updateUsagePill();
 
-  // Lock tool if already at limit — use setTimeout to ensure DOM is fully ready
+  // Lock tool if at limit
   if (currentPlan !== 'pro' && analysesUsed >= analysesLimit) {
-    console.log('[CDA] Limit reached on load — locking tool');
-    setTimeout(lockToolForUpgrade, 100);
+    console.log('[CDA] Limit reached — locking tool');
+    toolLocked = true;
+    // Use requestAnimationFrame to ensure DOM painted first
+    requestAnimationFrame(function() {
+      requestAnimationFrame(lockToolForUpgrade);
+    });
+  } else {
+    toolLocked = false;
   }
 }
 
@@ -2335,12 +2341,23 @@ function renderResult(r) {
 //  MAIN ANALYSIS
 // ══════════════════════════════════════════════
 async function runAnalysis() {
-  // Hard block if tool is locked
-  if (toolLocked) {
-    showUpgradeModal(true);
-    return;
+  // Always verify limit fresh from Supabase before running
+  if (currentUser) {
+    try {
+      const { data } = await supa
+        .from('users')
+        .select('plan, analyses_used, analyses_limit')
+        .eq('id', currentUser.id)
+        .single();
+      if (data) {
+        currentPlan   = data.plan           || 'free';
+        analysesUsed  = data.analyses_used  || 0;
+        analysesLimit = data.analyses_limit || 3;
+      }
+    } catch(e) {}
   }
-  // Check usage limit before running — always read from current state
+
+  // Hard check — regardless of JS state
   if (currentPlan !== 'pro' && analysesUsed >= analysesLimit) {
     lockToolForUpgrade();
     showUpgradeModal(true);
