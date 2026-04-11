@@ -903,7 +903,10 @@ async function signInWithGoogle() {
   setAuthMsg('Redirecting to Google...', '');
   const { error } = await supa.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin }
+    options: {
+      redirectTo: 'https://coredumpanalyzer.com',
+      queryParams: { access_type: 'offline', prompt: 'consent' }
+    }
   });
   if (error) setAuthMsg(error.message, 'err');
 }
