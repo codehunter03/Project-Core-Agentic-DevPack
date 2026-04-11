@@ -49,6 +49,13 @@ body{
   padding:1.5rem;
 }
 #gate.hidden{display:none}
+#gate.checking .gate-box{display:none}
+#gate.checking::after{
+  content:'';width:40px;height:40px;
+  border:3px solid #21262d;border-top-color:#388bfd;
+  border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
 @keyframes slideup{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 
 .gate-box{
@@ -192,11 +199,7 @@ header{
 
 /* ─── API KEY BANNER ─── */
 #key-banner{
-  background:linear-gradient(90deg,rgba(31,111,235,.12),rgba(137,87,229,.08));
-  border-bottom:1px solid rgba(88,166,255,.15);
-  padding:.55rem 1.5rem;
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  font-size:.72rem;
+  display:none !important;
 }
 #key-banner label{color:var(--blue);white-space:nowrap;font-weight:600}
 .key-input-wrap{
@@ -876,6 +879,31 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 }
 </style>
 
+<script>
+// Instant gate hide if we know user was logged in recently
+// Gate starts in "checking" state — this just keeps it that way or shows spinner
+(function() {
+  // Check if Supabase has a stored session in localStorage
+  try {
+    var keys = Object.keys(localStorage);
+    var hasSession = keys.some(function(k) {
+      return k.includes('supabase') && k.includes('auth');
+    });
+    if (hasSession) {
+      // Session likely exists — keep checking state (spinner shows)
+      // SDK will confirm and call onAuthSuccess
+    } else if (!sessionStorage.getItem('cda_logged_in')) {
+      // Definitely not logged in — show form immediately
+      document.addEventListener('DOMContentLoaded', function() {
+        var gate = document.getElementById('gate');
+        if (gate && gate.classList.contains('checking')) {
+          gate.className = '';
+        }
+      });
+    }
+  } catch(e) {}
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 // ══════════════════════════════════════════════════════════════
@@ -890,13 +918,6 @@ async function initSupabase() {
   if (typeof supabase === 'undefined') {
     setTimeout(initSupabase, 50);
     return;
-  }
-
-  // If URL has access_token (OAuth callback), show loading state
-  if (window.location.hash.includes('access_token') ||
-      window.location.search.includes('code=')) {
-    var gate = document.getElementById('gate');
-    if (gate) gate.innerHTML = '<div style="color:#e6edf3;font-size:1rem;text-align:center;padding:3rem"><div style="font-size:2rem;margin-bottom:1rem">⏳</div>Signing you in...</div>';
   }
 
   const { createClient } = supabase;
@@ -927,6 +948,10 @@ async function initSupabase() {
   console.log('[CDA Auth] Initial session:', sessionData?.session?.user?.email || 'none');
   if (sessionData?.session?.user) {
     await onAuthSuccess(sessionData.session.user);
+  } else {
+    // No session — show login form (remove checking state)
+    var gate = document.getElementById('gate');
+    if (gate) gate.className = '';
   }
 }
 initSupabase();
@@ -1037,9 +1062,11 @@ async function onAuthSuccess(user) {
   // Load user plan from our users table
   await loadUserPlan(user.id);
 
-  // Hide gate
+  // Hide gate immediately
   var gate = document.getElementById('gate');
   if (gate) gate.className = 'hidden';
+  // Also store minimal session indicator in sessionStorage for fast reload
+  sessionStorage.setItem('cda_logged_in', '1');
 
   // Set team token for Lambda
   localStorage.setItem('devpack_team_token', 'DevPackTeam2024!');
@@ -1095,17 +1122,18 @@ function updateUsagePill() {
   var upgrBtn = document.getElementById('upgrade-btn');
   if (!pill) return;
   if (currentPlan === 'pro') {
-    pill.textContent        = '⚡ Pro';
-    pill.style.color        = '#58a6ff';
-    pill.style.borderColor  = '#1f6feb';
-    pill.style.background   = 'rgba(31,111,235,.1)';
+    pill.textContent       = '⚡ Pro';
+    pill.style.color       = '#58a6ff';
+    pill.style.borderColor = '#1f6feb';
+    pill.style.background  = 'rgba(31,111,235,.1)';
     if (upgrBtn) upgrBtn.style.display = 'none';
   } else {
-    var left = analysesLimit - analysesUsed;
-    pill.textContent        = left + ' free left';
-    pill.style.color        = left > 0 ? '#e3b341' : '#ff6b6b';
-    pill.style.borderColor  = left > 0 ? '#e3b341' : '#ff3b30';
-    pill.style.background   = left > 0 ? 'rgba(227,179,65,.08)' : 'rgba(255,59,48,.08)';
+    var left = Math.max(0, analysesLimit - analysesUsed);
+    pill.textContent       = left > 0 ? left + ' free left' : 'Limit reached';
+    pill.style.color       = left > 0 ? '#e3b341' : '#ff6b6b';
+    pill.style.borderColor = left > 0 ? '#e3b341' : '#ff3b30';
+    pill.style.background  = left > 0 ? 'rgba(227,179,65,.08)' : 'rgba(255,59,48,.08)';
+    // Show upgrade button when 1 or fewer left — but never auto-open modal here
     if (upgrBtn) upgrBtn.style.display = left <= 1 ? 'block' : 'none';
   }
 }
@@ -1133,9 +1161,13 @@ async function incrementUsage() {
       .eq('id', currentUser.id);
   } catch(e) {}
 
-  // Show upgrade modal after last free analysis
+  // Update pill to show limit reached
   if (analysesUsed >= analysesLimit) {
-    setTimeout(showUpgradeModal, 2000);
+    updateUsagePill();
+    // Show upgrade modal after short delay so they can see the result first
+    setTimeout(function() {
+      if (analysesUsed >= analysesLimit) showUpgradeModal();
+    }, 3000);
   }
 }
 
@@ -1178,7 +1210,7 @@ function toggleGateEye() {}
 <body>
 
 <!-- ══ PASSWORD GATE ══ -->
-<div id="gate">
+<div id="gate" class="checking">
   <div class="gate-box">
 
     <!-- LEFT: Form -->
