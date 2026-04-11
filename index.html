@@ -1558,9 +1558,9 @@ void causeCrash() {
 
     <!-- Key note -->
     <div class="key-note">
-      🔐 <strong>Privacy:</strong> Your API key is sent securely to our private server — never exposed in browser source code.
+      🔐 <strong>Privacy:</strong> All analysis runs securely on our private server — your source code is never stored.
       Source code is analyzed via our secure backend and sent to Anthropic's API — not stored anywhere.
-      Get an API key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+      Powered by Claude AI &nbsp;·&nbsp; Secured by AWS Lambda
     </div>
   </div>
 
@@ -1573,10 +1573,10 @@ void causeCrash() {
       <div class="empty-glyph">🔬</div>
       <div class="empty-h">Ready to Analyze Core Dumps</div>
       <div class="empty-steps">
-        <div>① Enter your Anthropic API key above</div>
-        <div>② Paste your GDB backtrace</div>
-        <div>③ File advisor auto-scans in 1 second</div>
-        <div>④ Upload the suggested files</div>
+        <div>① Paste your GDB backtrace below</div>
+        <div>② Upload your source file</div>
+        <div>③ File advisor auto-scans required files</div>
+        <div>④ Click Investigate Crash</div>
         <div>⑤ Click <code>🔍 Investigate Crash</code></div>
       </div>
       <div style="font-size:.62rem;color:var(--t3)">C · C++ · Python · Go · Rust · Java · JS · TS</div>
@@ -2217,7 +2217,7 @@ async function runAnalysis() {
   if (!checkAnalysisLimit()) return;
 
   // API key handled server-side — use user's stored key or placeholder
-  const apiKey = localStorage.getItem('devpack_api_key') || 'server-managed';
+  const apiKey = 'server-managed';
   const bt = document.getElementById('bt').value.trim();
   const src = document.getElementById('src').value.trim();
   const model = document.getElementById('model-sel').value;
@@ -2358,10 +2358,10 @@ async function runAnalysis() {
   } catch(err) {
     lg('❌ '+err.message,'err');
     let hint='';
-    if(err.message.includes('401'))       hint=' — Your API key is invalid. Check at console.anthropic.com';
+    if(err.message.includes('401'))       hint=' — Analysis service error. Please try again.';
     else if(err.message.includes('429'))  hint=' — Rate limited. Wait 30 seconds and try again.';
-    else if(err.message.includes('402'))  hint=' — Insufficient credits. Add credits at console.anthropic.com/settings/billing';
-    else if(err.message.includes('credit')||err.message.includes('balance')) hint=' — Add credits at console.anthropic.com/settings/billing';
+    else if(err.message.includes('402'))  hint=' — Service temporarily unavailable. Please try again shortly.';
+    else if(err.message.includes('credit')||err.message.includes('balance')) hint=' — Service temporarily unavailable. Please try again shortly.';
     else if(err.message.includes('Failed to fetch')) hint=' — Check your internet connection.';
     else if(err.message.includes('overloaded')) hint=' — Anthropic API is busy. Wait 30 seconds and retry.';
     showErr(err.message+hint);
@@ -2543,13 +2543,13 @@ document.getElementById('bt').addEventListener('input', function() {
 
   // Debounce: wait 1s after user stops typing/pasting
   advisorDebounce = setTimeout(function() {
-    var apiKey    = localStorage.getItem('devpack_api_key') || '';
+    var apiKey    = 'server-managed';
     var teamToken = localStorage.getItem('devpack_team_token') || '';
 
     if (!apiKey) {
       if (typing) typing.classList.remove('show');
       if (status) status.textContent = '';
-      if (list) list.innerHTML = '<div style="color:var(--t3);font-size:.72rem">💡 Save your API key above to auto-scan required files.</div>';
+      if (list) list.innerHTML = '<div style="color:var(--t3);font-size:.72rem">💡 Click <strong>Analyse Files Needed</strong> to auto-scan required files.</div>';
       return;
     }
     if (!teamToken) {
@@ -2637,18 +2637,17 @@ function markAdvisorUploaded(fname) {
 
 
 async function runAdvisor() {
-  var apiKey  = localStorage.getItem('devpack_api_key') || '';
-  var bt      = document.getElementById('bt').value.trim();
-  var model   = document.getElementById('model-sel');
-  var panel   = document.getElementById('advisor-panel');
-  var typing  = document.getElementById('advisor-typing');
-  var list    = document.getElementById('advisor-list');
-  var note    = document.getElementById('advisor-note');
-  var status  = document.getElementById('advisor-status');
-  var rerunBtn = document.getElementById('advisor-rerun-btn');
+  var apiKey    = 'server-managed';
+  var bt        = document.getElementById('bt').value.trim();
+  var model     = document.getElementById('model-sel');
+  var panel     = document.getElementById('advisor-panel');
+  var typing    = document.getElementById('advisor-typing');
+  var list      = document.getElementById('advisor-list');
+  var note      = document.getElementById('advisor-note');
+  var status    = document.getElementById('advisor-status');
+  var rerunBtn  = document.getElementById('advisor-rerun-btn');
 
   if (!bt || bt.length < 20) return;
-  if (!apiKey) return;
   var teamToken = localStorage.getItem('devpack_team_token') || '';
   if (!teamToken) return; // Not logged in yet
 
@@ -2704,7 +2703,7 @@ async function runAdvisor() {
     var errMsg = err.message || 'Unknown error';
     var errHint = '';
     if (errMsg.includes('401') || errMsg.includes('Invalid team')) errHint = ' — Check your API key and password';
-    else if (errMsg.includes('402') || errMsg.includes('credit'))  errHint = ' — Add API credits at console.anthropic.com';
+    else if (errMsg.includes('402') || errMsg.includes('credit'))  errHint = ' — Service temporarily unavailable. Please try again.';
     else if (errMsg.includes('429')) errHint = ' — Rate limited, wait 30s and try again';
     else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) errHint = ' — Check internet connection';
     list.innerHTML = '<div style="color:var(--red);font-size:.72rem;padding:.5rem">❌ File scan failed: ' + errMsg + errHint + '</div>';
@@ -2853,7 +2852,7 @@ async function runSelfTest() {
   if (stRunning) return;
   stRunning = true;
 
-  var apiKey = localStorage.getItem('devpack_api_key') || '';
+  var apiKey = 'server-managed';
   var passed = 0, failed = 0;
 
   console.group('[DevPack Self-Test] Running health checks...');
@@ -2875,7 +2874,7 @@ async function runSelfTest() {
       stLog('② API Connectivity', 'pass', 'Anthropic API reachable');
       passed++;
     } else if (pingResp.status === 402) {
-      stLog('② API Connectivity', 'fail', 'No credits — add at console.anthropic.com/settings/billing');
+      stLog('② API Connectivity', 'fail', 'Service unavailable — contact support');
       failed++;
       console.groupEnd(); stRunning = false; return;
     } else if (pingResp.status === 401) {
@@ -3203,7 +3202,7 @@ async function sendFeedback(worked) {
 
   try {
     var teamToken = localStorage.getItem('devpack_team_token') || '';
-    var apiKey    = localStorage.getItem('devpack_api_key')    || '';
+    var apiKey    = 'server-managed'    || '';
 
     var payload = {
       fix_worked:   worked,
