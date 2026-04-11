@@ -142,9 +142,15 @@ body{
   font-size:.72rem;color:rgba(255,255,255,.65);text-align:left;
 }
 .gate-foot{margin-top:1.5rem;font-size:.6rem;color:rgba(255,255,255,.25);position:relative;z-index:1}
-.auth-tabs{display:flex;width:100%;margin-bottom:1.5rem;border-radius:8px;overflow:hidden;border:1px solid #30363d;background:#161b22}
-.auth-tab{flex:1;padding:9px;font-size:.78rem;font-weight:700;cursor:pointer;background:transparent;color:#8b949e;border:none;font-family:inherit;transition:all .2s}
-.auth-tab.active{background:linear-gradient(135deg,#1f6feb,#8957e5);color:#fff}
+.auth-view{width:100%;display:flex;flex-direction:column;align-items:center}
+.auth-links{
+  width:100%;display:flex;justify-content:space-between;
+  align-items:center;margin-bottom:.9rem;
+}
+.auth-note{
+  font-size:.7rem;color:#8b949e;text-align:center;
+  margin-top:.6rem;line-height:1.5;
+}
 @media(max-width:700px){
   .gate-box{width:100%;max-width:440px;grid-template-columns:1fr}
   .gate-right{display:none}
@@ -833,21 +839,32 @@ function initSupabase() {
     return;
   }
   const { createClient } = supabase;
-  supa = createClient(SUPA_URL, SUPA_ANON);
-  // Check session after init
-  supa.auth.getSession().then(function(res) {
-    if (res.data?.session?.user) {
-      onAuthSuccess(res.data.session.user);
+  supa = createClient(SUPA_URL, SUPA_ANON, {
+    auth: {
+      autoRefreshToken:    true,
+      persistSession:      true,
+      detectSessionInUrl:  true,
+      flowType:            'pkce',
     }
   });
-  // Listen for auth state changes
+
+  // Listen FIRST — before getSession — to catch OAuth callback
   supa.auth.onAuthStateChange(async function(event, session) {
-    if (event === 'SIGNED_IN' && session?.user) {
+    console.log('Auth event:', event, session?.user?.email);
+    if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
       await onAuthSuccess(session.user);
     }
     if (event === 'SIGNED_OUT') {
       var gate = document.getElementById('gate');
       if (gate) gate.className = '';
+    }
+  });
+
+  // Then check for existing session
+  supa.auth.getSession().then(function(res) {
+    console.log('Session check:', res.data?.session?.user?.email || 'none');
+    if (res.data?.session?.user) {
+      onAuthSuccess(res.data.session.user);
     }
   });
 }
@@ -860,36 +877,27 @@ var analysesUsed    = 0;
 var analysesLimit   = 3;
 
 // ── Auth tab switching ────────────────────────────────────────
-function switchAuthTab(tab) {}  // legacy — not used in split design
-
-function switchToSignIn() {
-  document.getElementById('auth-signup-form').style.display = 'none';
-  document.getElementById('auth-forgot-form').style.display = 'none';
-  // Show main form
-  document.getElementById('auth-email').closest('div') && null;
-  ['auth-email','auth-password'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.closest && (el.style.display = '');
+// ── Auth view switcher ────────────────────────────────────
+var VIEWS = ['signin','signup','forgot'];
+var VIEW_SUBS = {
+  signin: 'Sign in to continue',
+  signup: 'Create your free account',
+  forgot: 'Reset your password',
+};
+function showView(name) {
+  VIEWS.forEach(function(v) {
+    var el = document.getElementById('view-' + v);
+    if (el) el.style.display = v === name ? 'flex' : 'none';
   });
-  // Re-show main sign in button and links
-  var btn = document.querySelector('.gate-submit');
-  if (btn) btn.style.display = '';
-  var links = document.querySelector('#gate .gate-left > div[style*="justify-content"]');
-  if (links) links.style.display = '';
-  document.getElementById('auth-msg').textContent = '';
+  var sub = document.getElementById('gate-sub-text');
+  if (sub) sub.textContent = VIEW_SUBS[name] || '';
+  setAuthMsg('', '');
 }
-
-function switchToSignUp() {
-  document.getElementById('auth-signup-form').style.display = 'block';
-  document.getElementById('auth-forgot-form').style.display = 'none';
-  document.getElementById('auth-msg').textContent = '';
-}
-
-function showForgotPassword() {
-  document.getElementById('auth-forgot-form').style.display = 'block';
-  document.getElementById('auth-signup-form').style.display = 'none';
-  document.getElementById('auth-msg').textContent = '';
-}
+// Legacy aliases
+function switchAuthTab(tab) {}
+function switchToSignIn()   { showView('signin'); }
+function switchToSignUp()   { showView('signup'); }
+function showForgotPassword(){ showView('forgot'); }
 
 function setAuthMsg(msg, type) {
   var el = document.getElementById('auth-msg');
@@ -905,7 +913,7 @@ async function signInWithGoogle() {
     provider: 'google',
     options: {
       redirectTo: 'https://coredumpanalyzer.com',
-      queryParams: { access_type: 'offline', prompt: 'consent' }
+      skipBrowserRedirect: false,
     }
   });
   if (error) setAuthMsg(error.message, 'err');
@@ -913,8 +921,9 @@ async function signInWithGoogle() {
 
 // ── Email Sign In ─────────────────────────────────────────────
 async function doSignIn() {
-  var email = document.getElementById('auth-email').value.trim();
-  var pass  = document.getElementById('auth-password').value;
+  var email = (document.getElementById('si-email') || document.getElementById('auth-email') || {}).value || '';
+  email = email.trim();
+  var pass  = (document.getElementById('si-password') || document.getElementById('auth-password') || {}).value || '';
   if (!email || !pass) { setAuthMsg('Please enter email and password', 'err'); return; }
 
   setAuthMsg('Signing in...', '');
@@ -925,8 +934,9 @@ async function doSignIn() {
 
 // ── Email Sign Up ─────────────────────────────────────────────
 async function doSignUp() {
-  var email = document.getElementById('auth-signup-email').value.trim();
-  var pass  = document.getElementById('auth-signup-password').value;
+  var email = (document.getElementById('su-email') || document.getElementById('auth-signup-email') || {}).value || '';
+  email = email.trim();
+  var pass  = (document.getElementById('su-password') || document.getElementById('auth-signup-password') || {}).value || '';
   if (!email || !pass) { setAuthMsg('Please enter email and password', 'err'); return; }
   if (pass.length < 6)  { setAuthMsg('Password must be at least 6 characters', 'err'); return; }
 
@@ -946,7 +956,8 @@ async function doSignUp() {
 
 // ── Forgot Password ───────────────────────────────────────────
 async function doForgotPassword() {
-  var email = document.getElementById('auth-reset-email').value.trim();
+  var email = (document.getElementById('fp-email') || document.getElementById('auth-reset-email') || {}).value || '';
+  email = email.trim();
   if (!email) { setAuthMsg('Please enter your email', 'err'); return; }
 
   setAuthMsg('Sending reset link...', '');
@@ -1113,64 +1124,54 @@ function toggleGateEye() {}
     <div class="gate-left">
       <div class="gate-gem">🔬</div>
       <div class="gate-title">CoreDumpAnalyzer</div>
-      <div class="gate-sub">Sign in to your account</div>
+      <div class="gate-sub" id="gate-sub-text">Sign in to continue</div>
 
-      <!-- Google only -->
-      <button class="google-btn" onclick="signInWithGoogle()">
-        <svg width="18" height="18" viewBox="0 0 18 18">
-          <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
-          <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
-          <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18z"/>
-          <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
-        </svg>
-        Continue with Google
-      </button>
-
-      <div class="gate-divider">or sign in with email</div>
-
-      <!-- Email/Password -->
-      <input type="email" id="auth-email" class="gate-input"
-        placeholder="your@email.com" autocomplete="email">
-      <input type="password" id="auth-password" class="gate-input"
-        placeholder="Password" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter')doSignIn()">
-
-      <div style="width:100%;max-width:340px;display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">
-        <button class="gate-link" onclick="switchToSignUp()">New user? Sign up</button>
-        <button class="gate-link" onclick="showForgotPassword()">Forgot password?</button>
+      <!-- View: signin (default) -->
+      <div id="view-signin" class="auth-view">
+        <button class="google-btn" onclick="signInWithGoogle()">
+          <svg width="18" height="18" viewBox="0 0 18 18">
+            <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+            <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+            <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18z"/>
+            <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
+          </svg>
+          Continue with Google
+        </button>
+        <div class="gate-divider">or use email</div>
+        <input type="email" id="si-email" class="gate-input" placeholder="your@email.com" autocomplete="email">
+        <input type="password" id="si-password" class="gate-input" placeholder="Password"
+          autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()">
+        <div class="auth-links">
+          <button class="gate-link" onclick="showView('signup')">New user? Sign up free</button>
+          <button class="gate-link" onclick="showView('forgot')">Forgot password?</button>
+        </div>
+        <button class="gate-submit" onclick="doSignIn()">Sign In</button>
       </div>
 
-      <button class="gate-submit" onclick="doSignIn()">Sign In</button>
-
-      <!-- Sign up form (hidden by default) -->
-      <div id="auth-signup-form" style="display:none;width:100%;max-width:340px">
-        <input type="email" id="auth-signup-email" class="gate-input"
-          placeholder="your@email.com" autocomplete="email">
-        <input type="password" id="auth-signup-password" class="gate-input"
-          placeholder="Password (min 6 chars)" autocomplete="new-password"
-          onkeydown="if(event.key==='Enter')doSignUp()">
+      <!-- View: signup -->
+      <div id="view-signup" class="auth-view" style="display:none">
+        <input type="email" id="su-email" class="gate-input" placeholder="your@email.com" autocomplete="email">
+        <input type="password" id="su-password" class="gate-input" placeholder="Password (min 6 chars)"
+          autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignUp()">
         <button class="gate-submit" onclick="doSignUp()">Create Free Account</button>
-        <div style="margin-top:.75rem;font-size:.68rem;color:#8b949e;text-align:center">
-          3 free analyses — no card required
-        </div>
-        <div style="margin-top:.75rem;text-align:center">
-          <button class="gate-link" onclick="switchToSignIn()">Already have an account?</button>
+        <div class="auth-note">3 free analyses — no credit card required</div>
+        <div class="auth-links" style="justify-content:center;margin-top:.75rem">
+          <button class="gate-link" onclick="showView('signin')">← Already have an account?</button>
         </div>
       </div>
 
-      <!-- Forgot password form (hidden) -->
-      <div id="auth-forgot-form" style="display:none;width:100%;max-width:340px">
-        <div style="font-size:.8rem;color:#8b949e;margin-bottom:1rem;text-align:center">
-          Enter your email to receive a reset link
-        </div>
-        <input type="email" id="auth-reset-email" class="gate-input" placeholder="your@email.com">
+      <!-- View: forgot password -->
+      <div id="view-forgot" class="auth-view" style="display:none">
+        <div class="auth-note" style="margin-bottom:1rem">Enter your email and we'll send a reset link.</div>
+        <input type="email" id="fp-email" class="gate-input" placeholder="your@email.com">
         <button class="gate-submit" onclick="doForgotPassword()">Send Reset Link</button>
-        <div style="margin-top:.75rem;text-align:center">
-          <button class="gate-link" onclick="switchToSignIn()">← Back to sign in</button>
+        <div class="auth-links" style="justify-content:center;margin-top:.75rem">
+          <button class="gate-link" onclick="showView('signin')">← Back to sign in</button>
         </div>
       </div>
 
       <div id="auth-msg" class="gate-msg"></div>
+      <div class="gate-foot">Developed by Devendra Pillay &copy; 2026</div>
     </div>
 
     <!-- RIGHT: Branding -->
@@ -1178,28 +1179,15 @@ function toggleGateEye() {}
       <div class="gate-right-glyph">🔬</div>
       <div class="gate-right-title">AI-Powered<br>Crash Analysis</div>
       <div class="gate-right-sub">
-        Paste a GDB core dump and get the root cause,<br>
-        fix, and JIRA-ready RCA in under 30 seconds.
+        Paste a GDB core dump and get root cause,<br>
+        fix, and RCA doc in under 30 seconds.
       </div>
       <div class="gate-right-stats">
-        <div class="gate-stat">
-          <span class="gate-stat-icon">⚡</span>
-          30 second AI analysis
-        </div>
-        <div class="gate-stat">
-          <span class="gate-stat-icon">🔧</span>
-          Auto-generated code fix
-        </div>
-        <div class="gate-stat">
-          <span class="gate-stat-icon">📄</span>
-          One-click RCA PDF for JIRA
-        </div>
-        <div class="gate-stat">
-          <span class="gate-stat-icon">🧠</span>
-          Learns from every crash
-        </div>
+        <div class="gate-stat"><span>⚡</span> 30 second AI analysis</div>
+        <div class="gate-stat"><span>🔧</span> Auto-generated code fix</div>
+        <div class="gate-stat"><span>📄</span> One-click RCA PDF for JIRA</div>
+        <div class="gate-stat"><span>🧠</span> Learns from every crash</div>
       </div>
-      <div class="gate-foot">Developed by Devendra Pillay © 2026</div>
     </div>
 
   </div>
