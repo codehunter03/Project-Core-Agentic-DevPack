@@ -880,28 +880,39 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 </style>
 
 <script>
-// Instant gate hide if we know user was logged in recently
-// Gate starts in "checking" state — this just keeps it that way or shows spinner
+// Pre-check: show spinner or login immediately before SDK loads
 (function() {
-  // Check if Supabase has a stored session in localStorage
   try {
-    var keys = Object.keys(localStorage);
-    var hasSession = keys.some(function(k) {
-      return k.includes('supabase') && k.includes('auth');
-    });
-    if (hasSession) {
-      // Session likely exists — keep checking state (spinner shows)
-      // SDK will confirm and call onAuthSuccess
-    } else if (!sessionStorage.getItem('cda_logged_in')) {
-      // Definitely not logged in — show form immediately
+    // Check for Supabase session token in localStorage
+    var hasSupabaseSession = false;
+    for (var i = 0; i < localStorage.length; i++) {
+      var key = localStorage.key(i);
+      if (key && key.includes('supabase.auth.token')) {
+        try {
+          var val = JSON.parse(localStorage.getItem(key));
+          if (val && val.access_token) {
+            hasSupabaseSession = true;
+            break;
+          }
+        } catch(e) {}
+      }
+    }
+
+    if (!hasSupabaseSession) {
+      // No session token found — show login immediately
       document.addEventListener('DOMContentLoaded', function() {
         var gate = document.getElementById('gate');
-        if (gate && gate.classList.contains('checking')) {
-          gate.className = '';
-        }
+        if (gate) gate.className = '';
       });
     }
-  } catch(e) {}
+    // If session found: keep spinner, SDK will handle it
+  } catch(e) {
+    // On any error: show login
+    document.addEventListener('DOMContentLoaded', function() {
+      var gate = document.getElementById('gate');
+      if (gate) gate.className = '';
+    });
+  }
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
@@ -961,15 +972,34 @@ async function initSupabase() {
   }, 3000);
 
   try {
+    // Debug: show what's in localStorage
+    var lsKeys = Object.keys(localStorage).filter(function(k){ return k.includes('supabase'); });
+    console.log('[CDA Auth] Supabase localStorage keys:', lsKeys);
+
     const { data: sessionData, error: sessionError } = await supa.auth.getSession();
     sessionCheckDone = true;
     clearTimeout(sessionTimeout);
-    console.log('[CDA Auth] Session:', sessionData?.session?.user?.email || 'none', sessionError || '');
+
+    console.log('[CDA Auth] getSession result:', {
+      user: sessionData?.session?.user?.email || 'none',
+      expires: sessionData?.session?.expires_at,
+      error: sessionError?.message || 'none'
+    });
+
     if (sessionData?.session?.user) {
       await onAuthSuccess(sessionData.session.user);
     } else {
-      var gate = document.getElementById('gate');
-      if (gate) gate.className = '';
+      // Try refreshing the session before giving up
+      console.log('[CDA Auth] No session — trying refresh...');
+      const { data: refreshData } = await supa.auth.refreshSession();
+      if (refreshData?.session?.user) {
+        console.log('[CDA Auth] Refresh succeeded:', refreshData.session.user.email);
+        await onAuthSuccess(refreshData.session.user);
+      } else {
+        console.log('[CDA Auth] No session after refresh — showing login');
+        var gate = document.getElementById('gate');
+        if (gate) gate.className = '';
+      }
     }
   } catch(e) {
     sessionCheckDone = true;
@@ -1090,8 +1120,10 @@ async function onAuthSuccess(user) {
   // Hide gate immediately
   var gate = document.getElementById('gate');
   if (gate) gate.className = 'hidden';
-  // Also store minimal session indicator in sessionStorage for fast reload
+  // Store session indicator
   sessionStorage.setItem('cda_logged_in', '1');
+  // Store user email for display on fast reload
+  try { localStorage.setItem('cda_user_email', user.email || ''); } catch(e) {}
 
   // Set team token for Lambda
   localStorage.setItem('devpack_team_token', 'DevPackTeam2024!');
