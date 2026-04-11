@@ -1258,23 +1258,34 @@ function checkAnalysisLimit() {
 // ── Increment usage after analysis ───────────────────────────
 async function incrementUsage() {
   if (currentPlan === 'pro' || !currentUser) return;
+
+  // Increment locally
   analysesUsed++;
+
+  // Update Supabase — use rpc increment to avoid race conditions
+  try {
+    const { data } = await supa
+      .from('users')
+      .update({ analyses_used: analysesUsed })
+      .eq('id', currentUser.id)
+      .select('analyses_used')
+      .single();
+
+    // Use server value if returned (source of truth)
+    if (data && typeof data.analyses_used === 'number') {
+      analysesUsed = data.analyses_used;
+    }
+  } catch(e) {
+    console.log('[CDA] Could not update usage:', e.message);
+  }
+
+  // Update pill with real value
   updateUsagePill();
 
-  // Update in Supabase
-  try {
-    await supa.from('users')
-      .update({ analyses_used: analysesUsed })
-      .eq('id', currentUser.id);
-  } catch(e) {}
-
-  // If just hit the limit — show locked modal after delay
+  // Show locked modal if at limit
   if (analysesUsed >= analysesLimit) {
-    updateUsagePill();
     setTimeout(function() {
-      if (analysesUsed >= analysesLimit && currentPlan !== 'pro') {
-        showUpgradeModal(true); // locked
-      }
+      if (currentPlan !== 'pro') showUpgradeModal(true);
     }, 3000);
   }
 }
@@ -1345,13 +1356,19 @@ function goToCheckout() {
 
 // ── Sign out ──────────────────────────────────────────────────
 async function signOut() {
-  await supa.auth.signOut();
-  currentUser  = null;
-  currentPlan  = 'free';
-  analysesUsed = 0;
+  try { await supa.auth.signOut(); } catch(e) {}
+  // Clear all stored session data
+  localStorage.removeItem('cda-session');
+  localStorage.removeItem('cda-auth-v1');
   localStorage.removeItem('devpack_team_token');
-  var gate = document.getElementById('gate');
-  if (gate) gate.className = '';
+  localStorage.removeItem('cda_user_email');
+  sessionStorage.removeItem('cda_logged_in');
+  // Clear any supabase keys
+  Object.keys(localStorage).forEach(function(k) {
+    if (k.includes('supabase') || k.includes('sb-')) localStorage.removeItem(k);
+  });
+  // Hard reload — cleanest way to reset all state
+  window.location.href = window.location.pathname;
 }
 
 // Auth listeners set up in initSupabase() above
@@ -1846,11 +1863,19 @@ function clearLog() {
 //  PROGRESS
 // ══════════════════════════════════════════════
 function setStep(n) {
-  for(let i=0;i<5;i++){
+  var total = 5;
+  for(let i=0;i<total;i++){
     const b = document.getElementById('pb'+i);
-    b.className = 'pbar'+(i<n?' done':i===n?' live':'');
+    if (!b) continue;
+    if (n >= total) {
+      // Complete — all done, no live
+      b.className = 'pbar done';
+    } else {
+      b.className = 'pbar'+(i<n?' done':i===n?' live':'');
+    }
   }
-  document.getElementById('plbl').textContent = STEPS[Math.min(n,4)]||'Complete';
+  var lbl = document.getElementById('plbl');
+  if (lbl) lbl.textContent = n >= total ? 'Complete' : (STEPS[Math.min(n,4)]||'Complete');
 }
 
 // ══════════════════════════════════════════════
@@ -2362,6 +2387,7 @@ async function runAnalysis() {
     lg('Generating diff...'); await sleep(200); setStep(4);
     var elapsed = Math.round((Date.now() - analysisStart) / 1000);
     lg('✅ Analysis complete in ' + elapsed + 's!', 'ok');
+    setStep(5); // Mark all steps complete — no more 'live' bar
     renderResult(curResult);
     // Increment usage counter
     await incrementUsage();
