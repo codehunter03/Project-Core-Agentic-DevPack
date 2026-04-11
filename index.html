@@ -930,26 +930,51 @@ async function initSupabase() {
     }
   });
 
-  // Handle auth state — catches both OAuth redirect and existing sessions
+  // Handle auth state — catches OAuth redirect callback
   supa.auth.onAuthStateChange(async function(event, session) {
     console.log('[CDA Auth] Event:', event, '| User:', session?.user?.email || 'none');
     if (event === 'SIGNED_IN' && session?.user) {
-      await onAuthSuccess(session.user);
+      // Only handle if not already logged in (prevents double-call)
+      if (!currentUser) {
+        await onAuthSuccess(session.user);
+      }
     }
     if (event === 'SIGNED_OUT') {
       currentUser = null;
+      sessionStorage.removeItem('cda_logged_in');
       var gate = document.getElementById('gate');
       if (gate) gate.className = '';
     }
+    if (event === 'TOKEN_REFRESHED' && session?.user && !currentUser) {
+      await onAuthSuccess(session.user);
+    }
   });
 
-  // Check for existing session (covers page refresh with valid session)
-  const { data: sessionData } = await supa.auth.getSession();
-  console.log('[CDA Auth] Initial session:', sessionData?.session?.user?.email || 'none');
-  if (sessionData?.session?.user) {
-    await onAuthSuccess(sessionData.session.user);
-  } else {
-    // No session — show login form (remove checking state)
+  // Check for existing session with timeout fallback
+  var sessionCheckDone = false;
+  var sessionTimeout = setTimeout(function() {
+    if (!sessionCheckDone) {
+      console.log('[CDA Auth] Session check timed out — showing login');
+      var gate = document.getElementById('gate');
+      if (gate) gate.className = '';
+    }
+  }, 3000);
+
+  try {
+    const { data: sessionData, error: sessionError } = await supa.auth.getSession();
+    sessionCheckDone = true;
+    clearTimeout(sessionTimeout);
+    console.log('[CDA Auth] Session:', sessionData?.session?.user?.email || 'none', sessionError || '');
+    if (sessionData?.session?.user) {
+      await onAuthSuccess(sessionData.session.user);
+    } else {
+      var gate = document.getElementById('gate');
+      if (gate) gate.className = '';
+    }
+  } catch(e) {
+    sessionCheckDone = true;
+    clearTimeout(sessionTimeout);
+    console.error('[CDA Auth] Session check error:', e);
     var gate = document.getElementById('gate');
     if (gate) gate.className = '';
   }
