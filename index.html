@@ -770,82 +770,272 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-/* ══ PASSWORD GATE — Self-contained, runs before anything else ══ */
-(function() {
-  // Password check uses SHA-256 hash only — plain text not stored in source
-  var HASH = 'e34f5cbf233f274b8602ae750a3ea9a83a0e397b31cf2b9ae911b863a1557cf9';
+// ══════════════════════════════════════════════════════════════
+//  SUPABASE AUTH — CoreDumpAnalyzer
+// ══════════════════════════════════════════════════════════════
+const SUPA_URL  = 'https://qhwcvojiqzjlzlqqhvvo.supabase.co';
+const SUPA_ANON = 'sb_publishable_VGkKnxCdDtLk2NJ79Msu-g_FXU9S';
 
-  // Check session immediately
-  if (sessionStorage.getItem('devpack_ok') === '1') {
-    // Restore team token if session still active
-    if (!localStorage.getItem('devpack_team_token')) {
-      localStorage.setItem('devpack_team_token', 'DevPackTeam2024!');
-    }
-    document.addEventListener('DOMContentLoaded', function() {
-      var g = document.getElementById('gate');
-      if (g) g.className = 'hidden';
-    });
+// Init Supabase client — deferred to ensure SDK is loaded
+var supa = null;
+function initSupabase() {
+  if (typeof supabase === 'undefined') {
+    setTimeout(initSupabase, 50);
+    return;
   }
-
-  async function doSha256(str) {
-    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-    return Array.from(new Uint8Array(buf)).map(function(b) {
-      return b.toString(16).padStart(2, '0');
-    }).join('');
-  }
-
-  window.unlock = async function() {
-    var inp = document.getElementById('gate-inp');
-    var err = document.getElementById('gate-err');
-    var val = inp ? inp.value : '';
-
-    if (!val) {
-      if (err) err.textContent = 'Please enter the password';
-      return;
+  const { createClient } = supabase;
+  supa = createClient(SUPA_URL, SUPA_ANON);
+  // Check session after init
+  supa.auth.getSession().then(function(res) {
+    if (res.data?.session?.user) {
+      onAuthSuccess(res.data.session.user);
     }
-
-    // Always try plain match first (works everywhere)
-    var plainOk = false; // plain text fallback removed for security
-    var hashOk  = false;
-
-    try {
-      var h = await doSha256(val);
-      hashOk = (h === HASH);
-    } catch(e) {}
-
-    if (plainOk || hashOk) {
-      sessionStorage.setItem('devpack_ok', '1');
-      localStorage.setItem('devpack_team_token', 'DevPackTeam2024!');
+  });
+  // Listen for auth state changes
+  supa.auth.onAuthStateChange(async function(event, session) {
+    if (event === 'SIGNED_IN' && session?.user) {
+      await onAuthSuccess(session.user);
+    }
+    if (event === 'SIGNED_OUT') {
       var gate = document.getElementById('gate');
-      if (gate) gate.className = 'hidden';
-      if (err)  err.textContent = '';
-    } else {
-      if (err) {
-        err.textContent = 'Incorrect password. Try again.';
-        setTimeout(function() { err.textContent = ''; }, 3000);
-      }
-      if (inp) {
-        inp.classList.add('shake');
-        inp.value = '';
-        setTimeout(function() { inp.classList.remove('shake'); }, 400);
-      }
+      if (gate) gate.className = '';
     }
-  };
+  });
+}
+initSupabase();
 
-  window.toggleGateEye = function() {
-    var inp = document.getElementById('gate-inp');
-    if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
-  };
+// Current user state
+var currentUser     = null;
+var currentPlan     = 'free';
+var analysesUsed    = 0;
+var analysesLimit   = 3;
 
-  window.showGateErr = function(msg) {
-    var e = document.getElementById('gate-err');
-    if (e) {
-      e.textContent = msg;
-      setTimeout(function() { if (e.textContent === msg) e.textContent = ''; }, 3000);
+// ── Auth tab switching ────────────────────────────────────────
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(function(t, i) {
+    t.classList.toggle('active', (i === 0 && tab === 'signin') || (i === 1 && tab === 'signup'));
+  });
+  document.getElementById('auth-signin-form').style.display  = tab === 'signin'  ? 'block' : 'none';
+  document.getElementById('auth-signup-form').style.display  = tab === 'signup'  ? 'block' : 'none';
+  document.getElementById('auth-forgot-form').style.display  = 'none';
+  document.getElementById('auth-msg').textContent = '';
+}
+
+function showForgotPassword() {
+  document.getElementById('auth-signin-form').style.display = 'none';
+  document.getElementById('auth-forgot-form').style.display = 'block';
+  document.getElementById('auth-msg').textContent = '';
+}
+
+function setAuthMsg(msg, type) {
+  var el = document.getElementById('auth-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.className   = 'gate-msg ' + (type || '');
+}
+
+// ── Google Sign In ────────────────────────────────────────────
+async function signInWithGoogle() {
+  setAuthMsg('Redirecting to Google...', '');
+  const { error } = await supa.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin }
+  });
+  if (error) setAuthMsg(error.message, 'err');
+}
+
+// ── Email Sign In ─────────────────────────────────────────────
+async function doSignIn() {
+  var email = document.getElementById('auth-email').value.trim();
+  var pass  = document.getElementById('auth-password').value;
+  if (!email || !pass) { setAuthMsg('Please enter email and password', 'err'); return; }
+
+  setAuthMsg('Signing in...', '');
+  const { data, error } = await supa.auth.signInWithPassword({ email, password: pass });
+  if (error) { setAuthMsg(error.message, 'err'); return; }
+  onAuthSuccess(data.user);
+}
+
+// ── Email Sign Up ─────────────────────────────────────────────
+async function doSignUp() {
+  var email = document.getElementById('auth-signup-email').value.trim();
+  var pass  = document.getElementById('auth-signup-password').value;
+  if (!email || !pass) { setAuthMsg('Please enter email and password', 'err'); return; }
+  if (pass.length < 6)  { setAuthMsg('Password must be at least 6 characters', 'err'); return; }
+
+  setAuthMsg('Creating account...', '');
+  const { data, error } = await supa.auth.signUp({
+    email, password: pass,
+    options: { emailRedirectTo: window.location.origin }
+  });
+  if (error) { setAuthMsg(error.message, 'err'); return; }
+
+  if (data.user && !data.user.email_confirmed_at) {
+    setAuthMsg('✅ Check your email to confirm your account!', 'ok');
+  } else {
+    onAuthSuccess(data.user);
+  }
+}
+
+// ── Forgot Password ───────────────────────────────────────────
+async function doForgotPassword() {
+  var email = document.getElementById('auth-reset-email').value.trim();
+  if (!email) { setAuthMsg('Please enter your email', 'err'); return; }
+
+  setAuthMsg('Sending reset link...', '');
+  const { error } = await supa.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '?reset=1'
+  });
+  if (error) { setAuthMsg(error.message, 'err'); return; }
+  setAuthMsg('✅ Reset link sent! Check your inbox.', 'ok');
+}
+
+// ── On successful auth ────────────────────────────────────────
+async function onAuthSuccess(user) {
+  if (!user) return;
+  currentUser = user;
+
+  // Load user plan from our users table
+  await loadUserPlan(user.id);
+
+  // Hide gate
+  var gate = document.getElementById('gate');
+  if (gate) gate.className = 'hidden';
+
+  // Set team token for Lambda
+  localStorage.setItem('devpack_team_token', 'DevPackTeam2024!');
+
+  // Update header badge
+  updateUserBadge(user.email);
+}
+
+// ── Load user plan ────────────────────────────────────────────
+async function loadUserPlan(userId) {
+  try {
+    const { data, error } = await supa
+      .from('users')
+      .select('plan, analyses_used, analyses_limit')
+      .eq('id', userId)
+      .single();
+
+    if (data) {
+      currentPlan    = data.plan          || 'free';
+      analysesUsed   = data.analyses_used || 0;
+      analysesLimit  = data.analyses_limit || 3;
     }
-  };
-})();
+  } catch(e) {
+    console.log('Could not load plan:', e);
+  }
+}
+
+// ── Update header with user info ──────────────────────────────
+function updateUserBadge(email) {
+  var badge = document.getElementById('key-badge');
+  if (badge && email) {
+    var name = email.split('@')[0];
+    badge.textContent  = '👤 ' + name;
+    badge.style.color  = '#56d364';
+    badge.style.borderColor = '#238636';
+    badge.style.background  = 'rgba(35,134,54,.1)';
+  }
+
+  // Show usage counter in header
+  var pill = document.getElementById('usage-pill');
+  if (!pill) {
+    pill = document.createElement('span');
+    pill.id = 'usage-pill';
+    pill.className = 'pill';
+    var badges = document.querySelector('.hbadges');
+    if (badges) badges.insertBefore(pill, badges.firstChild);
+  }
+  updateUsagePill();
+}
+
+function updateUsagePill() {
+  var pill    = document.getElementById('usage-pill');
+  var upgrBtn = document.getElementById('upgrade-btn');
+  if (!pill) return;
+  if (currentPlan === 'pro') {
+    pill.textContent        = '⚡ Pro';
+    pill.style.color        = '#58a6ff';
+    pill.style.borderColor  = '#1f6feb';
+    pill.style.background   = 'rgba(31,111,235,.1)';
+    if (upgrBtn) upgrBtn.style.display = 'none';
+  } else {
+    var left = analysesLimit - analysesUsed;
+    pill.textContent        = left + ' free left';
+    pill.style.color        = left > 0 ? '#e3b341' : '#ff6b6b';
+    pill.style.borderColor  = left > 0 ? '#e3b341' : '#ff3b30';
+    pill.style.background   = left > 0 ? 'rgba(227,179,65,.08)' : 'rgba(255,59,48,.08)';
+    if (upgrBtn) upgrBtn.style.display = left <= 1 ? 'block' : 'none';
+  }
+}
+
+// ── Check limit before analysis ───────────────────────────────
+function checkAnalysisLimit() {
+  if (currentPlan === 'pro') return true;  // unlimited
+  if (analysesUsed >= analysesLimit) {
+    showUpgradeModal();
+    return false;
+  }
+  return true;
+}
+
+// ── Increment usage after analysis ───────────────────────────
+async function incrementUsage() {
+  if (currentPlan === 'pro' || !currentUser) return;
+  analysesUsed++;
+  updateUsagePill();
+
+  // Update in Supabase
+  try {
+    await supa.from('users')
+      .update({ analyses_used: analysesUsed })
+      .eq('id', currentUser.id);
+  } catch(e) {}
+
+  // Show upgrade modal after last free analysis
+  if (analysesUsed >= analysesLimit) {
+    setTimeout(showUpgradeModal, 2000);
+  }
+}
+
+// ── Upgrade modal ─────────────────────────────────────────────
+function showUpgradeModal() {
+  document.getElementById('upgrade-modal').classList.add('show');
+}
+function closeUpgradeModal() {
+  document.getElementById('upgrade-modal').classList.remove('show');
+}
+
+// ── Stripe checkout ───────────────────────────────────────────
+function goToCheckout() {
+  // Redirect to Stripe payment link (you'll add this after creating Stripe product)
+  var stripeLink = 'https://buy.stripe.com/REPLACE_WITH_YOUR_STRIPE_LINK';
+  if (currentUser) {
+    stripeLink += '?prefilled_email=' + encodeURIComponent(currentUser.email);
+  }
+  window.open(stripeLink, '_blank');
+}
+
+// ── Sign out ──────────────────────────────────────────────────
+async function signOut() {
+  await supa.auth.signOut();
+  currentUser  = null;
+  currentPlan  = 'free';
+  analysesUsed = 0;
+  localStorage.removeItem('devpack_team_token');
+  var gate = document.getElementById('gate');
+  if (gate) gate.className = '';
+}
+
+// Auth listeners set up in initSupabase() above
+
+// Legacy functions to avoid breaking other code
+window.unlock = function() {};
+function toggleGateEye() {}
 </script>
 </head>
 <body>
@@ -855,23 +1045,89 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
   <div class="gate-box">
     <div class="gate-gem">🔬</div>
     <div class="gate-title">CoreDumpAnalyzer</div>
-    <div class="gate-sub" style="font-size:.68rem;color:var(--t2);margin-bottom:1.5rem;line-height:1.7">
-      Core Dump Analyzer &amp; Auto-Fix Engine<br>
-      Enter your team access password to continue
+    <div class="gate-sub">AI-Powered Core Dump Analysis &amp; Auto-Fix Engine</div>
+
+    <!-- Auth tabs -->
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('signin')">Sign In</button>
+      <button class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</button>
     </div>
-    <div class="gate-wrap">
-      <input type="password" id="gate-inp" placeholder="••••••••••"
-        autocomplete="off" onkeydown="if(event.key==='Enter')unlock()">
-      <button id="gate-eye" onclick="toggleGateEye()">👁</button>
+
+    <!-- Google Sign In -->
+    <button class="google-btn" onclick="signInWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg>
+      Continue with Google
+    </button>
+
+    <div class="auth-divider">or</div>
+
+    <!-- Email/Password form -->
+    <div id="auth-signin-form">
+      <input type="email" id="auth-email" class="gate-input" placeholder="your@email.com" autocomplete="email">
+      <input type="password" id="auth-password" class="gate-input" placeholder="Password"
+        autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()">
+      <div style="text-align:right;margin-bottom:.75rem">
+        <button class="gate-link" onclick="showForgotPassword()">Forgot password?</button>
+      </div>
+      <button class="gate-submit" onclick="doSignIn()">Sign In</button>
     </div>
-    <div id="gate-err"></div>
-    <button id="gate-btn" onclick="unlock()">🔓 Unlock DevPack</button>
+
+    <div id="auth-signup-form" style="display:none">
+      <input type="email" id="auth-signup-email" class="gate-input" placeholder="your@email.com" autocomplete="email">
+      <input type="password" id="auth-signup-password" class="gate-input" placeholder="Password (min 6 chars)"
+        autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignUp()">
+      <button class="gate-submit" onclick="doSignUp()">Create Free Account</button>
+      <div style="margin-top:.75rem;font-size:.68rem;color:var(--t3);text-align:center">
+        Free tier includes 3 analyses — no card required
+      </div>
+    </div>
+
+    <div id="auth-forgot-form" style="display:none">
+      <div style="font-size:.8rem;color:var(--t2);margin-bottom:1rem">
+        Enter your email and we'll send a reset link.
+      </div>
+      <input type="email" id="auth-reset-email" class="gate-input" placeholder="your@email.com">
+      <button class="gate-submit" onclick="doForgotPassword()">Send Reset Link</button>
+      <div style="text-align:center;margin-top:.75rem">
+        <button class="gate-link" onclick="switchAuthTab('signin')">← Back to sign in</button>
+      </div>
+    </div>
+
+    <div id="auth-msg" class="gate-msg"></div>
+
     <div class="gate-foot">
-      🔐 Access restricted to authorized team members only<br>
-      Contact your admin if you need access<br><br>
-      <span style="color:var(--t3);font-size:.58rem">
-        Developed by Devendra Pillay &copy; 2026
-      </span>
+      Developed by Devendra Pillay &copy; 2026
+    </div>
+  </div>
+</div>
+
+<!-- ══ UPGRADE MODAL ══ -->
+<div id="upgrade-modal">
+  <div class="upgrade-box">
+    <div class="upgrade-header">
+      <div class="upgrade-icon">🚀</div>
+      <div class="upgrade-title">Upgrade to Pro</div>
+      <div class="upgrade-sub">You've used all 3 free analyses</div>
+    </div>
+    <div class="upgrade-body">
+      <div class="upgrade-price">$9.99<span>/month</span></div>
+      <ul class="upgrade-features">
+        <li>Unlimited crash analyses</li>
+        <li>Full AI reasoning chain</li>
+        <li>RCA PDF export for JIRA</li>
+        <li>Iterative fix chat</li>
+        <li>Self-learning from your crashes</li>
+        <li>Priority support</li>
+      </ul>
+      <button class="upgrade-btn" onclick="goToCheckout()">
+        Upgrade Now — $9.99/month
+      </button>
+      <button class="upgrade-skip" onclick="closeUpgradeModal()">
+        Maybe later
+      </button>
+    </div>
+    <div class="free-bar">
+      🔒 Secured by Stripe · Cancel anytime
     </div>
   </div>
 </div>
@@ -888,7 +1144,14 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
   <div class="hbadges">
     <span class="pill" style="color:#56d364;border-color:#238636;background:rgba(35,134,54,.1)">v1.0</span>
     <span class="pill" id="model-badge" style="color:#8b949e;border-color:#30363d;background:#161b22">claude-haiku-4-5</span>
-<span class="pill" id="key-badge" style="color:#e3b341;border-color:#e3b341;background:rgba(227,179,65,.08)">⚠ No API Key</span>
+    <span class="pill" id="key-badge" style="color:#e3b341;border-color:#e3b341;background:rgba(227,179,65,.08)">⚠ No API Key</span>
+    <button onclick="showUpgradeModal()" id="upgrade-btn" style="display:none;
+      background:linear-gradient(135deg,#1f6feb,#388bfd);border:none;color:#fff;
+      border-radius:5px;padding:4px 12px;font-size:.68rem;font-weight:700;
+      cursor:pointer;font-family:inherit">⚡ Upgrade</button>
+    <button onclick="signOut()" style="background:none;border:1px solid var(--s5);
+      color:var(--t3);border-radius:5px;padding:4px 10px;font-size:.65rem;
+      cursor:pointer;font-family:inherit" title="Sign out">↪ Sign out</button>
   </div>
 </header>
 
@@ -1722,6 +1985,9 @@ function renderResult(r) {
 //  MAIN ANALYSIS
 // ══════════════════════════════════════════════
 async function runAnalysis() {
+  // Check usage limit before running
+  if (!checkAnalysisLimit()) return;
+
   const apiKey = localStorage.getItem('devpack_api_key')||document.getElementById('api-key-input').value.trim();
   const bt = document.getElementById('bt').value.trim();
   const src = document.getElementById('src').value.trim();
@@ -1848,6 +2114,8 @@ async function runAnalysis() {
     var elapsed = Math.round((Date.now() - analysisStart) / 1000);
     lg('✅ Analysis complete in ' + elapsed + 's!', 'ok');
     renderResult(curResult);
+    // Increment usage counter
+    await incrementUsage();
     // Show feedback bar
     curAnalysisId = respData.analysis_id || null;
     var fbBar = document.getElementById('feedback-bar');
