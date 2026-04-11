@@ -958,7 +958,7 @@ async function initSupabase() {
     console.log('[CDA Auth]', event, session?.user?.email || 'no user');
 
     if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-      // Manually persist session for reliable restore on refresh
+      // Save session to localStorage for restore on refresh
       try {
         localStorage.setItem('cda-session', JSON.stringify({
           access_token:  session.access_token,
@@ -967,6 +967,9 @@ async function initSupabase() {
           user:          { id: session.user.id, email: session.user.email }
         }));
       } catch(e) {}
+      // Always hide gate and update state
+      var g = document.getElementById('gate');
+      if (g) { g.className = 'hidden'; g.style.display = 'none'; }
       if (!currentUser) await onAuthSuccess(session.user);
     }
 
@@ -1004,6 +1007,8 @@ async function initSupabase() {
         const { data } = await supa.auth.refreshSession({ refresh_token: saved.refresh_token });
         if (data?.user) {
           console.log('[CDA Auth] Token refreshed ✅');
+          var g = document.getElementById('gate');
+          if (g) { g.className = 'hidden'; g.style.display = 'none'; }
           await onAuthSuccess(data.user);
           return;
         }
@@ -1133,12 +1138,12 @@ async function onAuthSuccess(user) {
   if (!user) return;
   currentUser = user;
 
+  // Hide gate FIRST — before any async operations
+  var gate = document.getElementById('gate');
+  if (gate) { gate.className = 'hidden'; gate.style.display = 'none'; }
+
   // Load user plan from our users table
   await loadUserPlan(user.id);
-
-  // Hide gate immediately
-  var gate = document.getElementById('gate');
-  if (gate) gate.className = 'hidden';
   // Store session indicator
   sessionStorage.setItem('cda_logged_in', '1');
   // Store user email for display on fast reload
