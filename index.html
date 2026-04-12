@@ -1164,26 +1164,38 @@ async function loadUserPlan(userId) {
 
 // ── Update header with user info ──────────────────────────────
 function updateUserBadge(email) {
-  var badge = document.getElementById('key-badge');
-  if (badge && email) {
-    var name = email.split('@')[0];
-    badge.textContent  = '👤 ' + name;
-    badge.style.color  = '#56d364';
-    badge.style.borderColor = '#238636';
-    badge.style.background  = 'rgba(35,134,54,.1)';
+  if (!email) return;
+
+  // Show user badge container
+  var userBadge = document.getElementById('user-badge');
+  if (userBadge) userBadge.style.display = 'flex';
+
+  // Set avatar initials
+  var avatar = document.getElementById('user-avatar');
+  if (avatar) {
+    var uname = email.split('@')[0];
+    var parts = uname.split(/[._\-0-9]+/).filter(function(p){ return p.length > 0; });
+    var initials = parts.length >= 2
+      ? (parts[0][0] + parts[1][0]).toUpperCase()
+      : uname.slice(0, 2).toUpperCase();
+    avatar.textContent = initials;
+    avatar.title = email;
   }
 
-  // Show usage counter in header — just create element, loadUserPlan fills it
-  if (!document.getElementById('usage-pill')) {
-    var pill = document.createElement('span');
-    pill.id = 'usage-pill';
-    pill.className = 'pill';
-    pill.textContent = '...';
-    pill.style.color = '#8b949e';
-    var badges = document.querySelector('.hbadges');
-    if (badges) badges.insertBefore(pill, badges.firstChild);
+  // Set display name
+  var nameEl = document.getElementById('user-name');
+  if (nameEl) {
+    nameEl.textContent = email.split('@')[0];
   }
-  // Don't call updateUsagePill here — loadUserPlan does it with real data
+
+  // Show usage pill
+  var pill = document.getElementById('usage-pill');
+  if (pill) {
+    pill.style.display = '';
+    pill.textContent   = '...';
+    pill.className     = 'pill';
+    pill.style.color   = '#8b949e';
+  }
 }
 
 function updateUsagePill() {
