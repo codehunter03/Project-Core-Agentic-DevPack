@@ -2439,60 +2439,67 @@ async function runAnalysis() {
     var LAMBDA   = 'https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze';
     var teamTok  = localStorage.getItem('devpack_team_token') || '';
 
-    for (var attempt = 1; attempt <= maxRetries; attempt++) {
-      if (attempt === 2) {
-        lg('🔄 Retrying with more powerful model (Sonnet)...', 'info');
-        await sleep(1000);
-      } else if (attempt === 3) {
-        lg('🔄 Final attempt with Sonnet + strict mode...', 'info');
-        await sleep(1000);
+    // Single call with smart model selection — Lambda handles retries internally
+    lg('🤖 Analyzing with AI (this may take 20-40s for complex crashes)...', 'info');
+
+    // Detect complexity to choose model upfront
+    var isComplex = bt.length > 3000 || src.length > 6000;
+    if (isComplex) lg('📊 Complex crash detected — using Sonnet for better accuracy...', 'info');
+
+    var resp = await fetch(LAMBDA, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key':    apiKey,
+        'X-Team-Token': teamTok,
+      },
+      body: JSON.stringify({
+        backtrace:       bt,
+        source:          src,
+        filename:        curFname,
+        additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
+        strict_json:     isComplex, // Use Sonnet from start for complex crashes
+        attempt:         1,
+      }),
+    });
+
+    // Log actual HTTP status for debugging
+    console.log('[CDA] Lambda response status:', resp.status);
+
+    if (!resp.ok) {
+      var errData = await resp.json().catch(function(){ return {}; });
+      var errMsg  = errData.error || ('Server error: HTTP ' + resp.status);
+      console.error('[CDA] Lambda error:', errMsg);
+
+      // Specific user-friendly messages
+      if (resp.status === 401) throw new Error('Authentication error — please sign out and sign in again.');
+      if (resp.status === 429) throw new Error('Too many requests — please wait 30 seconds and try again.');
+      if (resp.status === 504) throw new Error('Analysis timed out — your crash may be too large. Try with a shorter backtrace or smaller source file.');
+      throw new Error(errMsg);
+    }
+
+    var respData;
+    try { respData = await resp.json(); }
+    catch(e) { throw new Error('Server returned invalid response — please try again.'); }
+
+    var raw = respData.result || '';
+    lastRaw = raw;
+    console.log('[CDA] Raw response length:', raw.length, 'chars');
+
+    if (!raw || raw.length < 10) {
+      throw new Error('AI returned empty response — please try again.');
+    }
+
+    // Extract JSON from response
+    try {
+      parsed = extractJSON(raw);
+      if (!parsed || !parsed.root_cause) {
+        throw new Error('AI response incomplete — missing root cause analysis.');
       }
-
-      var resp = await fetch(LAMBDA, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key':    apiKey,
-          'X-Team-Token': teamTok,
-        },
-        body: JSON.stringify({
-          backtrace:       bt,
-          source:          src,
-          filename:        curFname,
-          additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
-          strict_json:     attempt > 1,   // triggers Sonnet on Lambda
-          attempt:         attempt,
-        }),
-      });
-
-      if (!resp.ok) {
-        var errData = await resp.json().catch(function(){ return {}; });
-        var errMsg  = errData.error || 'HTTP ' + resp.status;
-        if (attempt === maxRetries) throw new Error(errMsg);
-        continue;
-      }
-
-      var respData;
-      try { respData = await resp.json(); }
-      catch(e) {
-        if (attempt === maxRetries) throw new Error('Server returned invalid response');
-        continue;
-      }
-
-      var raw = respData.result || '';
-      lastRaw = raw;
-
-      // Try to extract JSON from response
-      try {
-        parsed = extractJSON(raw);
-        if (parsed && parsed.root_cause) break; // clean success
-        if (attempt === maxRetries) throw new Error('AI response missing required fields');
-      } catch(parseErr) {
-        console.error('Attempt ' + attempt + ' parse failed:', raw.slice(0, 200));
-        if (attempt === maxRetries) {
-          throw new Error('Analysis failed after ' + maxRetries + ' attempts. The crash may be too complex — try uploading fewer source files.');
-        }
-      }
+    } catch(parseErr) {
+      console.error('[CDA] Parse error. Raw:', raw.slice(0, 500));
+      // Last resort: try to salvage partial data
+      throw new Error('Could not parse AI response. Try reducing your source file size or backtrace length.');
     }
 
     lg('Parsing AI response...'); setStep(3); await sleep(200);
