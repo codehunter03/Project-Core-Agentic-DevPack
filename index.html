@@ -1196,13 +1196,13 @@ async function loadUserPlan(userId) {
   // Always update pill with real data
   updateUsagePill();
 
-  // Lock tool if at limit
+  // Lock tool if at limit — show overlay but NOT the popup modal on refresh
   if (currentPlan !== 'pro' && analysesUsed >= analysesLimit) {
     console.log('[CDA] Limit reached — locking tool');
     toolLocked = true;
-    // Use requestAnimationFrame to ensure DOM painted first
     requestAnimationFrame(function() {
       requestAnimationFrame(lockToolForUpgrade);
+      // Don't auto-show modal on refresh — user can click upgrade button
     });
   } else {
     toolLocked = false;
@@ -1448,28 +1448,26 @@ function goToCheckout() {
 
 // ── Sign out ──────────────────────────────────────────────────
 async function signOut() {
-  // Remove overlay first so sign out button is accessible
-  var lock = document.getElementById('workspace-lock');
-  if (lock) lock.remove();
-  var banner = document.getElementById('upgrade-banner');
-  if (banner) banner.remove();
+  // Remove ALL overlays and modals immediately
+  ['workspace-lock','upgrade-banner','upgrade-modal'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.style.display = 'none';
+      el.style.zIndex  = '-1';
+    }
+  });
 
+  // Clear Supabase session
   try { await supa.auth.signOut(); } catch(e) {}
 
-  // Clear all stored session data
-  ['cda-session','cda-auth-v1','devpack_team_token',
-   'cda_user_email','cda-auth'].forEach(function(k) {
-    localStorage.removeItem(k);
-  });
-  sessionStorage.removeItem('cda_logged_in');
+  // Clear ALL local/session storage
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch(e) {}
 
-  // Clear supabase keys
-  Object.keys(localStorage).forEach(function(k) {
-    if (k.includes('supabase') || k.includes('sb-')) localStorage.removeItem(k);
-  });
-
-  // Hard reload
-  window.location.href = window.location.pathname;
+  // Hard reload to clean state
+  window.location.replace(window.location.pathname);
 }
 
 // Auth listeners set up in initSupabase() above
@@ -1602,7 +1600,8 @@ function toggleGateEye() {}
       cursor:pointer;font-family:inherit;z-index:1001;position:relative">⚡ Upgrade Pro</button>
     <button onclick="signOut()" style="background:none;border:1px solid var(--s5);
       color:var(--t3);border-radius:5px;padding:4px 10px;font-size:.65rem;
-      cursor:pointer;font-family:inherit" title="Sign out">↪ Sign out</button>
+      cursor:pointer;font-family:inherit;position:relative;z-index:9999"
+      title="Sign out">↪ Sign out</button>
   </div>
 </header>
 
