@@ -1538,11 +1538,26 @@ function toggleGateEye() {}
       background:linear-gradient(135deg,#1f6feb,#8957e5);border:none;color:#fff;
       border-radius:6px;padding:5px 14px;font-size:.72rem;font-weight:700;
       cursor:pointer;font-family:inherit;z-index:1001;position:relative">⚡ Upgrade Pro</button>
-    <button id="signout-btn" onclick="signOut()" style="background:none;border:1px solid var(--s5);
-      color:var(--t3);border-radius:5px;padding:4px 10px;font-size:.65rem;
-      cursor:pointer;font-family:inherit;position:relative;z-index:99999;
-      pointer-events:all !important"
-      title="Sign out">↪ Sign out</button>
+    <button id="signout-btn" title="Sign out"
+      style="background:none;border:1px solid #30363d;color:#8b949e;
+      border-radius:5px;padding:4px 10px;font-size:.65rem;cursor:pointer;
+      font-family:inherit;position:fixed;top:14px;right:16px;
+      z-index:2147483647;pointer-events:all"
+      onclick="(function(){
+        try{document.querySelectorAll('#workspace-lock,#upgrade-banner,#upgrade-modal').forEach(function(e){e.remove();});}catch(ex){}
+        try{if(window.supa)window.supa.auth.signOut();}catch(ex){}
+        setTimeout(function(){
+          try{
+            for(var i=localStorage.length-1;i>=0;i--){
+              var k=localStorage.key(i);
+              if(k&&(k.startsWith('cda-')||k.startsWith('sb-')||k.includes('supabase')||k==='devpack_team_token'))
+                localStorage.removeItem(k);
+            }
+            sessionStorage.clear();
+          }catch(ex){}
+          window.location.replace(location.pathname);
+        },300);
+      })()">↪ Sign out</button>
   </div>
 </header>
 
