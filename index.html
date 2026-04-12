@@ -827,6 +827,24 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 }
 
 
+/* ── Sign out button ── */
+#signout-btn{
+  background:none;
+  border:1px solid var(--s4);
+  color:var(--t3);
+  border-radius:6px;
+  padding:4px 12px;
+  font-size:.72rem;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all .15s;
+}
+#signout-btn:hover{
+  color:var(--t1);
+  border-color:var(--s5);
+  background:var(--s2);
+}
+
 /* ── Upgrade Modal ── */
 #upgrade-modal{
   position:fixed;inset:0;z-index:999999;
@@ -1336,7 +1354,7 @@ function lockToolForUpgrade() {
     var headerH = (document.querySelector('header')?.offsetHeight || 60) + 'px';
     overlay.style.cssText = [
       'position:fixed',
-      'top:' + headerH,
+      'top:' + headerH,  /* always below header */
       'left:0;right:0',
       'bottom:0',
       'z-index:900',
@@ -1539,10 +1557,6 @@ function toggleGateEye() {}
       border-radius:6px;padding:5px 14px;font-size:.72rem;font-weight:700;
       cursor:pointer;font-family:inherit;z-index:1001;position:relative">⚡ Upgrade Pro</button>
     <button id="signout-btn" title="Sign out"
-      style="background:none;border:1px solid #30363d;color:#8b949e;
-      border-radius:5px;padding:4px 10px;font-size:.65rem;cursor:pointer;
-      font-family:inherit;position:fixed;top:14px;right:16px;
-      z-index:2147483647;pointer-events:all"
       onclick="(function(){
         try{document.querySelectorAll('#workspace-lock,#upgrade-banner,#upgrade-modal').forEach(function(e){e.remove();});}catch(ex){}
         try{if(window.supa)window.supa.auth.signOut();}catch(ex){}
