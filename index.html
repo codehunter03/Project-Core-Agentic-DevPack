@@ -2443,7 +2443,7 @@ async function runAnalysis() {
     var lastRaw  = '';
     var maxRetries = 3;
     var LAMBDA   = 'https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze';
-    var teamTok  = localStorage.getItem('devpack_team_token') || '';
+    var teamTok  = 'DevPackTeam2024!';
 
     // Single call with smart model selection — Lambda handles retries internally
     lg('🤖 Analyzing with AI (this may take 20-40s for complex crashes)...', 'info');
@@ -2452,22 +2452,14 @@ async function runAnalysis() {
     var isComplex = bt.length > 3000 || src.length > 6000;
     if (isComplex) lg('📊 Complex crash detected — using Sonnet for better accuracy...', 'info');
 
-    // Get user token from session
-    var userToken = '';
-    try {
-      var cdaSess = JSON.parse(localStorage.getItem('cda-session') || '{}');
-      userToken = cdaSess.access_token || '';
-    } catch(e) {}
-
-    console.log('[CDA] Sending to Lambda. teamTok:', !!teamTok, 'userToken:', !!userToken, 'apiKey:', apiKey.slice(0,15));
+    console.log('[CDA] Sending to Lambda. apiKey:', apiKey.slice(0,15), 'teamTok:', !!teamTok);
 
     var resp = await fetch(LAMBDA, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
-        'X-Team-Token': teamTok || 'DevPackTeam2024!',
-        'X-User-Token': userToken,
+        'X-Team-Token': 'DevPackTeam2024!',
       },
       body: JSON.stringify({
         backtrace:       bt,
@@ -2673,8 +2665,7 @@ async function sendFollowup() {
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
-        'X-Team-Token': localStorage.getItem('devpack_team_token') || '',
-        'X-User-Token': (function(){ try{ return JSON.parse(localStorage.getItem('cda-session')||'{}').access_token||''; }catch(e){return '';} })(),
+        'X-Team-Token': 'DevPackTeam2024!',
       },
       body: JSON.stringify({ messages: chatHistory })
     });
@@ -2736,7 +2727,7 @@ document.getElementById('bt').addEventListener('input', function() {
   // Debounce: wait 1s after user stops typing/pasting
   advisorDebounce = setTimeout(function() {
     var apiKey    = 'server-managed';
-    var teamToken = localStorage.getItem('devpack_team_token') || '';
+    var teamToken = 'DevPackTeam2024!';
 
     if (!apiKey) {
       if (typing) typing.classList.remove('show');
@@ -2840,7 +2831,7 @@ async function runAdvisor() {
   var rerunBtn  = document.getElementById('advisor-rerun-btn');
 
   if (!bt || bt.length < 20) return;
-  var teamToken = localStorage.getItem('devpack_team_token') || '';
+  var teamToken = 'DevPackTeam2024!';
   if (!teamToken) return; // Not logged in yet
 
   // Show scanning state
@@ -3064,7 +3055,7 @@ async function runSelfTest() {
   try {
     var pingResp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/health', {
       method: 'GET',
-      headers: { 'X-Api-Key': apiKey, 'X-Team-Token': localStorage.getItem('devpack_team_token')||'' }
+      headers: { 'X-Api-Key': apiKey, 'X-Team-Token': 'DevPackTeam2024!' }
     });
 
     if (pingResp.status === 200) {
@@ -3100,7 +3091,7 @@ async function runSelfTest() {
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
-        'X-Team-Token': localStorage.getItem('devpack_team_token') || '',
+        'X-Team-Token': 'DevPackTeam2024!',
       },
       body: JSON.stringify({
         backtrace: ST_BACKTRACE,
@@ -3424,7 +3415,7 @@ async function sendFeedback(worked) {
   if (status) status.textContent = 'Saving...';
 
   try {
-    var teamToken = localStorage.getItem('devpack_team_token') || '';
+    var teamToken = 'DevPackTeam2024!';
     var apiKey    = 'server-managed'    || '';
 
     var payload = {
