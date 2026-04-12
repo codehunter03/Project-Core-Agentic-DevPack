@@ -882,33 +882,26 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 </style>
 
 <script>
-// Pre-check: immediately show login or keep spinner
+// ── Pre-check: show login immediately if no session ──────────────────────
 (function() {
   try {
-    var session = localStorage.getItem('cda-session');
-    var hasSession = false;
-    if (session) {
-      var s = JSON.parse(session);
-      // Check token not expired
-      if (s && s.access_token && s.expires_at > Math.floor(Date.now()/1000)) {
-        hasSession = true;
-      } else {
-        // Expired — clean it up now
-        localStorage.removeItem('cda-session');
-      }
+    // Supabase stores session under our storageKey
+    var raw = localStorage.getItem('cda-sb-session');
+    var ok  = false;
+    if (raw) {
+      var s = JSON.parse(raw);
+      ok = !!(s && s.access_token && s.expires_at > Math.floor(Date.now()/1000));
     }
-    if (!hasSession) {
-      // Show login form immediately — no spinner needed
+    if (!ok) {
       document.addEventListener('DOMContentLoaded', function() {
-        var gate = document.getElementById('gate');
-        if (gate) gate.className = '';
+        var g = document.getElementById('gate');
+        if (g) g.className = '';
       });
     }
-    // hasSession = true → keep spinner, initSupabase will restore
   } catch(e) {
     document.addEventListener('DOMContentLoaded', function() {
-      var gate = document.getElementById('gate');
-      if (gate) gate.className = '';
+      var g = document.getElementById('gate');
+      if (g) g.className = '';
     });
   }
 })();
@@ -920,14 +913,12 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 // ══════════════════════════════════════════════════════════════
 const SUPA_URL  = 'https://qhwcvojiqzjlzlqqhvvo.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFod2N2b2ppcXpqbHpscXFodnZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MzY2NjEsImV4cCI6MjA5MTQxMjY2MX0.g7FowZL0-kUKsl4T7BsbQ5DlTYm2wxbCIsaCHu-gpnE';
+const SESSION_KEY = 'cda-sb-session';
 
-// Init Supabase client — deferred to ensure SDK is loaded
 var supa = null;
+
 async function initSupabase() {
-  if (typeof supabase === 'undefined') {
-    setTimeout(initSupabase, 50);
-    return;
-  }
+  if (typeof supabase === 'undefined') { setTimeout(initSupabase, 50); return; }
 
   const { createClient } = supabase;
   supa = createClient(SUPA_URL, SUPA_ANON, {
@@ -935,90 +926,44 @@ async function initSupabase() {
       autoRefreshToken:   true,
       persistSession:     true,
       detectSessionInUrl: true,
-      storageKey:         'cda-auth-v1',
+      storageKey:         SESSION_KEY,
       storage:            window.localStorage,
     }
   });
 
-  // Listen for auth events
+  // Auth state listener — handles sign in, token refresh, sign out
   supa.auth.onAuthStateChange(async function(event, session) {
-    console.log('[CDA Auth]', event, session?.user?.email || 'no user');
-
-    if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-      // Save session to localStorage for restore on refresh
-      try {
-        localStorage.setItem('cda-session', JSON.stringify({
-          access_token:  session.access_token,
-          refresh_token: session.refresh_token,
-          expires_at:    session.expires_at || Math.floor(Date.now()/1000) + 3600,
-          user:          { id: session.user.id, email: session.user.email }
-        }));
-      } catch(e) {}
-      // Always hide gate and update state
+    console.log('[CDA]', event, session?.user?.email || '');
+    if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
       var g = document.getElementById('gate');
       if (g) { g.className = 'hidden'; g.style.display = 'none'; }
       if (!currentUser) await onAuthSuccess(session.user);
     }
-
     if (event === 'SIGNED_OUT') {
       currentUser = null;
-      localStorage.removeItem('cda-session');
-      sessionStorage.removeItem('cda_logged_in');
-      var gate = document.getElementById('gate');
-      if (gate) gate.className = '';
+      var g = document.getElementById('gate');
+      if (g) { g.className = ''; g.style.display = ''; }
     }
   });
 
-  // Try to restore session from our manual backup first
-  var gate = document.getElementById('gate');
-  try {
-    var savedRaw = localStorage.getItem('cda-session');
-    if (savedRaw) {
-      var saved = JSON.parse(savedRaw);
-      // Check not expired (expires_at is Unix timestamp)
-      if (saved.access_token && saved.expires_at > Math.floor(Date.now()/1000)) {
-        console.log('[CDA Auth] Restoring saved session for', saved.user?.email);
-        // Set session in Supabase using saved tokens
-        const { data, error } = await supa.auth.setSession({
-          access_token:  saved.access_token,
-          refresh_token: saved.refresh_token,
-        });
-        if (data?.user) {
-          console.log('[CDA Auth] Session restored ✅');
-          await onAuthSuccess(data.user);
-          return;
-        }
-      } else if (saved.refresh_token) {
-        // Token expired — try refresh
-        console.log('[CDA Auth] Token expired — refreshing...');
-        const { data } = await supa.auth.refreshSession({ refresh_token: saved.refresh_token });
-        if (data?.user) {
-          console.log('[CDA Auth] Token refreshed ✅');
-          var g = document.getElementById('gate');
-          if (g) { g.className = 'hidden'; g.style.display = 'none'; }
-          await onAuthSuccess(data.user);
-          return;
-        }
-      }
-    }
-  } catch(e) {
-    console.log('[CDA Auth] Session restore error:', e.message);
-    localStorage.removeItem('cda-session');
-  }
-
-  // Fallback: check Supabase's own session
+  // Check for existing session on load
   try {
     const { data } = await supa.auth.getSession();
     if (data?.session?.user) {
-      console.log('[CDA Auth] Supabase session found ✅');
+      console.log('[CDA] Session found:', data.session.user.email);
+      var g = document.getElementById('gate');
+      if (g) { g.className = 'hidden'; g.style.display = 'none'; }
       await onAuthSuccess(data.session.user);
-      return;
+    } else {
+      console.log('[CDA] No session — showing login');
+      var g = document.getElementById('gate');
+      if (g) g.className = '';
     }
-  } catch(e) {}
-
-  // No session — show login
-  console.log('[CDA Auth] No session — showing login');
-  if (gate) gate.className = '';
+  } catch(e) {
+    console.error('[CDA] Session check error:', e.message);
+    var g = document.getElementById('gate');
+    if (g) g.className = '';
+  }
 }
 initSupabase();
 
@@ -1444,8 +1389,8 @@ async function signOut() {
   try { await supa.auth.signOut({ scope: 'local' }); } catch(e) {}
 
   // Remove ONLY our session keys — surgical cleanup
-  var keysToRemove = ['cda-session', 'cda-auth-v1', 'cda-auth',
-                      'devpack_team_token', 'cda_user_email'];
+  var keysToRemove = ['cda-sb-session', 'cda-session', 'cda-auth-v1',
+                      'cda-auth', 'devpack_team_token', 'cda_user_email'];
   keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
   sessionStorage.clear();
 
