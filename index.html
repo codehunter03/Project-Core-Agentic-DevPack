@@ -2432,62 +2432,66 @@ async function runAnalysis() {
 
     // Prompt built server-side
 
-    // ── Auto-retry up to 3 times on JSON parse failure ──────────────────
-    var parsed = null;
-    var lastRaw = '';
+    // ── Smart retry: Haiku first, auto-escalate to Sonnet ───────────────
+    var parsed   = null;
+    var lastRaw  = '';
     var maxRetries = 3;
+    var LAMBDA   = 'https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze';
+    var teamTok  = localStorage.getItem('devpack_team_token') || '';
 
     for (var attempt = 1; attempt <= maxRetries; attempt++) {
-      if (attempt > 1) {
-        lg('⚠️ JSON parse failed — auto-retrying (' + attempt + '/' + maxRetries + ')...', 'info');
-        await sleep(1500);
+      if (attempt === 2) {
+        lg('🔄 Retrying with more powerful model (Sonnet)...', 'info');
+        await sleep(1000);
+      } else if (attempt === 3) {
+        lg('🔄 Final attempt with Sonnet + strict mode...', 'info');
+        await sleep(1000);
       }
 
-      var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze', {
+      var resp = await fetch(LAMBDA, {
         method: 'POST',
         headers: {
-          'Content-Type':  'application/json',
-          'X-Api-Key':     apiKey,
-          'X-Team-Token':  localStorage.getItem('devpack_team_token') || '',
+          'Content-Type': 'application/json',
+          'X-Api-Key':    apiKey,
+          'X-Team-Token': teamTok,
         },
         body: JSON.stringify({
           backtrace:       bt,
           source:          src,
           filename:        curFname,
           additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
-          strict_json:     attempt > 1,  // Signal Lambda to be stricter on retry
+          strict_json:     attempt > 1,   // triggers Sonnet on Lambda
+          attempt:         attempt,
         }),
       });
 
       if (!resp.ok) {
         var errData = await resp.json().catch(function(){ return {}; });
-        throw new Error(errData.error || 'HTTP ' + resp.status);
+        var errMsg  = errData.error || 'HTTP ' + resp.status;
+        if (attempt === maxRetries) throw new Error(errMsg);
+        continue;
       }
 
       var respData;
       try { respData = await resp.json(); }
-      catch(e) { throw new Error('Server returned invalid response'); }
+      catch(e) {
+        if (attempt === maxRetries) throw new Error('Server returned invalid response');
+        continue;
+      }
 
       var raw = respData.result || '';
       lastRaw = raw;
 
-      if (!raw || !raw.includes('{')) {
-        console.error('Attempt ' + attempt + ' — non-JSON response:', raw.slice(0,200));
-        if (attempt === maxRetries) {
-          throw new Error('AI returned invalid response after ' + maxRetries + ' attempts — try with a smaller source file');
-        }
-        continue; // retry
-      }
-
+      // Try to extract JSON from response
       try {
         parsed = extractJSON(raw);
-        break; // success — exit retry loop
+        if (parsed && parsed.root_cause) break; // clean success
+        if (attempt === maxRetries) throw new Error('AI response missing required fields');
       } catch(parseErr) {
-        console.error('Attempt ' + attempt + ' — parse failed:', raw.slice(0,300));
+        console.error('Attempt ' + attempt + ' parse failed:', raw.slice(0, 200));
         if (attempt === maxRetries) {
-          throw new Error('Could not parse AI response after ' + maxRetries + ' attempts — ' + parseErr.message);
+          throw new Error('Analysis failed after ' + maxRetries + ' attempts. The crash may be too complex — try uploading fewer source files.');
         }
-        // continue to retry
       }
     }
 
@@ -2933,6 +2937,11 @@ function uploadSingleFile(input, expectedName) {
 
 // ── Robust JSON extractor — handles markdown fences, preamble, nested braces ──
 function extractJSON(raw) {
+  if (!raw) throw new Error('Empty response');
+  // Clean common AI response artifacts
+  raw = raw.trim();
+  // Remove markdown code fences if present
+  raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
   if (!raw) throw new Error('Empty response from AI');
 
   // Strip markdown code fences
