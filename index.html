@@ -2955,49 +2955,55 @@ function uploadSingleFile(input, expectedName) {
 // ── Robust JSON extractor — handles markdown fences, preamble, nested braces ──
 function extractJSON(raw) {
   if (!raw) throw new Error('Empty response');
-  // Clean common AI response artifacts
-  raw = raw.trim();
-  // Remove markdown code fences if present
-  raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
-  if (!raw) throw new Error('Empty response from AI');
 
-  // Strip markdown code fences
-  var clean = raw
-    .replace(/```json\s*/gi, '')
-    .replace(/```\s*/g, '')
-    .trim();
+  // Clean all markdown artifacts
+  var clean = raw.trim()
+    .replace(/^```json\s*/im, '').replace(/^```\s*/im, '')
+    .replace(/\s*```\s*$/im, '').trim();
 
-  // Find outermost valid JSON object using brace depth counting
-  var start = -1, depth = 0;
-  for (var i = 0; i < clean.length; i++) {
-    if (clean[i] === '{') {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (clean[i] === '}') {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        var candidate = clean.slice(start, i + 1);
-        try {
-          return JSON.parse(candidate);
-        } catch(e) {
-          // Try to salvage by removing trailing commas (common AI mistake)
-          var salvaged = candidate
-            .replace(/,\s*}/g, '}')
-            .replace(/,\s*]/g, ']');
-          try {
-            return JSON.parse(salvaged);
-          } catch(e2) {
-            // Log raw for debugging and surface meaningful error
-            console.error('Raw AI response:', raw.slice(0, 500));
-            throw new Error('AI returned malformed JSON — try again or switch to Sonnet model');
-          }
-        }
-      }
-    }
+  // Strategy 1: direct parse
+  try { return JSON.parse(clean); } catch(e) {}
+
+  // Strategy 2: find first { to last }
+  var first = clean.indexOf('{');
+  var last  = clean.lastIndexOf('}');
+  if (first !== -1 && last !== -1 && last > first) {
+    var slice = clean.slice(first, last + 1);
+    try { return JSON.parse(slice); } catch(e) {}
+
+    // Strategy 3: fix trailing commas
+    var fixed = slice.replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(fixed); } catch(e) {}
+
+    // Strategy 4: remove problematic fixed_code field which often breaks JSON
+    var noCode = fixed.replace(/"fixed_code"\s*:\s*"(?:[^"\\]|\\.)*"\s*,?/g, '');
+    try {
+      var r = JSON.parse(noCode);
+      r.fixed_code = null;
+      return r;
+    } catch(e) {}
+
+    // Strategy 5: extract field by field manually
+    try {
+      var obj = {};
+      var fields = ['root_cause','bug_category','severity','confidence',
+                    'faulting_function','explanation','fix_explanation',
+                    'patch_summary','buggy_line_code','fixed_line_code'];
+      fields.forEach(function(f) {
+        var m = clean.match(new RegExp('"' + f + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"'));
+        if (m) obj[f] = m[1].replace(/\\n/g,'\n').replace(/\\"/g,'"');
+      });
+      var numFields = ['faulting_line','buggy_line_num','fixed_line_num'];
+      numFields.forEach(function(f) {
+        var m = clean.match(new RegExp('"' + f + '"\\s*:\\s*(\\d+)'));
+        if (m) obj[f] = parseInt(m[1]);
+      });
+      if (obj.root_cause) return obj;
+    } catch(e) {}
   }
 
-  console.error('Raw AI response:', raw.slice(0, 500));
-  throw new Error('No JSON object found in AI response — try again');
+  console.error('Could not parse. Raw start:', raw.slice(0, 300));
+  throw new Error('Could not parse AI response — please try again');
 }
 
 
