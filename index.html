@@ -2452,19 +2452,29 @@ async function runAnalysis() {
     var isComplex = bt.length > 3000 || src.length > 6000;
     if (isComplex) lg('📊 Complex crash detected — using Sonnet for better accuracy...', 'info');
 
+    // Get user token from session
+    var userToken = '';
+    try {
+      var cdaSess = JSON.parse(localStorage.getItem('cda-session') || '{}');
+      userToken = cdaSess.access_token || '';
+    } catch(e) {}
+
+    console.log('[CDA] Sending to Lambda. teamTok:', !!teamTok, 'userToken:', !!userToken, 'apiKey:', apiKey.slice(0,15));
+
     var resp = await fetch(LAMBDA, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
-        'X-Team-Token': teamTok,
+        'X-Team-Token': teamTok || 'DevPackTeam2024!',
+        'X-User-Token': userToken,
       },
       body: JSON.stringify({
         backtrace:       bt,
         source:          src,
         filename:        curFname,
         additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
-        strict_json:     isComplex, // Use Sonnet from start for complex crashes
+        strict_json:     isComplex,
         attempt:         1,
       }),
     });
