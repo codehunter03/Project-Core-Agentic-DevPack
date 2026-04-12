@@ -882,49 +882,34 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 </style>
 
 <script>
-// Pre-check: show spinner or login immediately before SDK loads
+// Pre-check: immediately show login or keep spinner
 (function() {
   try {
-    // Check for Supabase session token in localStorage
-    var hasSupabaseSession = false;
-    // Check our custom storage key
-    var stored = localStorage.getItem('cda-auth');
-    if (stored) {
-      try {
-        var val = JSON.parse(stored);
-        if (val && val.access_token) hasSupabaseSession = true;
-      } catch(e) {}
-    }
-    // Also check default Supabase key
-    if (!hasSupabaseSession) {
-      for (var i = 0; i < localStorage.length; i++) {
-        var key = localStorage.key(i);
-        if (key && (key.includes('supabase') || key.includes('sb-'))) {
-          hasSupabaseSession = true;
-          break;
-        }
+    var session = localStorage.getItem('cda-session');
+    var hasSession = false;
+    if (session) {
+      var s = JSON.parse(session);
+      // Check token not expired
+      if (s && s.access_token && s.expires_at > Math.floor(Date.now()/1000)) {
+        hasSession = true;
+      } else {
+        // Expired — clean it up now
+        localStorage.removeItem('cda-session');
       }
     }
-
-    if (!hasSupabaseSession) {
-      // No session token found — show login immediately
+    if (!hasSession) {
+      // Show login form immediately — no spinner needed
       document.addEventListener('DOMContentLoaded', function() {
         var gate = document.getElementById('gate');
         if (gate) gate.className = '';
       });
     }
-    // If session found: keep spinner, SDK will handle it
+    // hasSession = true → keep spinner, initSupabase will restore
   } catch(e) {
-    // On any error: show login
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() {
-        var gate = document.getElementById('gate');
-        if (gate) gate.className = '';
-      });
-    } else {
+    document.addEventListener('DOMContentLoaded', function() {
       var gate = document.getElementById('gate');
       if (gate) gate.className = '';
-    }
+    });
   }
 })();
 </script>
@@ -965,7 +950,7 @@ async function initSupabase() {
         localStorage.setItem('cda-session', JSON.stringify({
           access_token:  session.access_token,
           refresh_token: session.refresh_token,
-          expires_at:    session.expires_at,
+          expires_at:    session.expires_at || Math.floor(Date.now()/1000) + 3600,
           user:          { id: session.user.id, email: session.user.email }
         }));
       } catch(e) {}
@@ -1448,25 +1433,30 @@ function goToCheckout() {
 
 // ── Sign out ──────────────────────────────────────────────────
 async function signOut() {
-  // Remove ALL overlays and modals immediately
+  // Hide overlays immediately so button is responsive
   ['workspace-lock','upgrade-banner','upgrade-modal'].forEach(function(id) {
     var el = document.getElementById(id);
-    if (el) {
-      el.style.display = 'none';
-      el.style.zIndex  = '-1';
-    }
+    if (el) { el.style.display = 'none'; el.style.zIndex = '-1'; }
   });
 
-  // Clear Supabase session
-  try { await supa.auth.signOut(); } catch(e) {}
+  // Sign out from Supabase
+  try { await supa.auth.signOut({ scope: 'local' }); } catch(e) {}
 
-  // Clear ALL local/session storage
-  try {
-    localStorage.clear();
-    sessionStorage.clear();
-  } catch(e) {}
+  // Remove ONLY our session keys — surgical cleanup
+  var keysToRemove = ['cda-session', 'cda-auth-v1', 'cda-auth',
+                      'devpack_team_token', 'cda_user_email'];
+  keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+  sessionStorage.clear();
 
-  // Hard reload to clean state
+  // Remove any sb- or supabase keys
+  var allKeys = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && (k.startsWith('sb-') || k.includes('supabase'))) allKeys.push(k);
+  }
+  allKeys.forEach(function(k) { localStorage.removeItem(k); });
+
+  // Reload to login screen
   window.location.replace(window.location.pathname);
 }
 
