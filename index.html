@@ -52,9 +52,14 @@ body{
 }
 #gate.hidden{display:none}
 #gate.checking .gate-box{display:none}
+#gate.checking::before{
+  content:'Signing you in...';
+  color:#8b949e;font-size:.8rem;font-family:inherit;
+  margin-bottom:1rem;display:block;text-align:center;
+}
 #gate.checking::after{
-  content:'';width:40px;height:40px;
-  border:3px solid #21262d;border-top-color:#388bfd;
+  content:'';width:36px;height:36px;
+  border:2px solid #21262d;border-top-color:#388bfd;
   border-radius:50%;animation:spin .7s linear infinite;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -1185,6 +1190,7 @@ function updateUsagePill() {
   var pill    = document.getElementById('usage-pill');
   var upgrBtn = document.getElementById('upgrade-btn');
   if (!pill) return;
+  pill.style.display = '';
   if (currentPlan === 'pro') {
     pill.textContent       = '⚡ Pro';
     pill.style.color       = '#58a6ff';
@@ -1550,7 +1556,19 @@ function toggleGateEye() {}
   </div>
   <div class="hbadges">
     <span class="pill" style="color:#56d364;border-color:#238636;background:rgba(35,134,54,.1)">v1.0</span>
-    <span class="pill" id="model-badge" style="color:#8b949e;border-color:#30363d;background:#161b22">claude-haiku-4-5</span>
+    <span class="pill" id="model-badge" style="color:#8b949e;border-color:#30363d;background:#161b22">claude-sonnet</span>
+    <span class="pill" id="usage-pill" style="display:none"></span>
+    <div id="user-badge" style="display:none;align-items:center;gap:8px">
+      <div id="user-avatar" style="
+        width:28px;height:28px;border-radius:50%;
+        background:linear-gradient(135deg,#1f6feb,#8957e5);
+        display:flex;align-items:center;justify-content:center;
+        font-size:.68rem;font-weight:700;color:#fff;flex-shrink:0;
+        cursor:default;user-select:none;
+      "></div>
+      <span id="user-name" style="font-size:.72rem;color:var(--t2);max-width:120px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    </div>
     <span class="pill" id="key-badge" style="display:none"></span>
     <button onclick="showUpgradeModal(true)" id="upgrade-btn" style="display:none;
       background:linear-gradient(135deg,#1f6feb,#8957e5);border:none;color:#fff;
