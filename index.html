@@ -179,7 +179,7 @@ header{
   border-bottom:1px solid var(--s4);
   padding:0 1.5rem; height:58px;
   display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:1000;
+  position:sticky;top:0;z-index:99998;pointer-events:all;
   box-shadow:0 1px 0 rgba(255,255,255,0.04);
 }
 .logo{display:flex;align-items:center;gap:12px}
@@ -1388,14 +1388,15 @@ function lockToolForUpgrade() {
     overlay.id = 'workspace-lock';
     overlay.onclick = function() { showUpgradeModal(true); };
     // Position below header (~60px), above footer banner (~70px)
+    var headerH = (document.querySelector('header')?.offsetHeight || 60) + 'px';
     overlay.style.cssText = [
       'position:fixed',
-      'top:60px',           // below header
+      'top:' + headerH,
       'left:0;right:0',
-      'bottom:70px',        // above bottom banner
-      'z-index:500',        // above workspace content, below header (200) is wrong — header is 200 sticky
+      'bottom:0',
+      'z-index:900',
       'cursor:pointer',
-      'background:rgba(13,17,23,.75)',
+      'background:rgba(13,17,23,.82)',
       'backdrop-filter:blur(3px)',
       'display:flex;align-items:center;justify-content:center',
     ].join(';');
@@ -1456,8 +1457,12 @@ async function signOut() {
   }
   allKeys.forEach(function(k) { localStorage.removeItem(k); });
 
-  // Reload to login screen
-  window.location.replace(window.location.pathname);
+  // Remove overlay from DOM entirely before reload
+  var lock = document.getElementById('workspace-lock');
+  if (lock) lock.parentNode && lock.parentNode.removeChild(lock);
+
+  // Reload cleanly — only affects THIS tab
+  window.location.replace(window.location.href.split('#')[0].split('?')[0]);
 }
 
 // Auth listeners set up in initSupabase() above
@@ -1588,9 +1593,10 @@ function toggleGateEye() {}
       background:linear-gradient(135deg,#1f6feb,#8957e5);border:none;color:#fff;
       border-radius:6px;padding:5px 14px;font-size:.72rem;font-weight:700;
       cursor:pointer;font-family:inherit;z-index:1001;position:relative">⚡ Upgrade Pro</button>
-    <button onclick="signOut()" style="background:none;border:1px solid var(--s5);
+    <button id="signout-btn" onclick="signOut()" style="background:none;border:1px solid var(--s5);
       color:var(--t3);border-radius:5px;padding:4px 10px;font-size:.65rem;
-      cursor:pointer;font-family:inherit;position:relative;z-index:9999"
+      cursor:pointer;font-family:inherit;position:relative;z-index:99999;
+      pointer-events:all !important"
       title="Sign out">↪ Sign out</button>
   </div>
 </header>
@@ -2467,15 +2473,17 @@ async function runAnalysis() {
     console.log('[CDA] Lambda response status:', resp.status);
 
     if (!resp.ok) {
-      var errData = await resp.json().catch(function(){ return {}; });
-      var errMsg  = errData.error || ('Server error: HTTP ' + resp.status);
-      console.error('[CDA] Lambda error:', errMsg);
+      var errText = await resp.text().catch(function(){ return ''; });
+      var errData = {};
+      try { errData = JSON.parse(errText); } catch(e) {}
+      var errMsg = errData.error || errText || ('HTTP ' + resp.status);
+      console.error('[CDA] Lambda error ' + resp.status + ':', errMsg);
+      lg('❌ Server error ' + resp.status + ': ' + errMsg.slice(0,100), 'err');
 
-      // Specific user-friendly messages
-      if (resp.status === 401) throw new Error('Authentication error — please sign out and sign in again.');
-      if (resp.status === 429) throw new Error('Too many requests — please wait 30 seconds and try again.');
-      if (resp.status === 504) throw new Error('Analysis timed out — your crash may be too large. Try with a shorter backtrace or smaller source file.');
-      throw new Error(errMsg);
+      if (resp.status === 401) throw new Error('Auth error: ' + errMsg);
+      if (resp.status === 429) throw new Error('Rate limited — wait 30 seconds and retry.');
+      if (resp.status === 504) throw new Error('Timeout — try a shorter backtrace or smaller source file.');
+      throw new Error('Lambda error ' + resp.status + ': ' + errMsg);
     }
 
     var respData;
@@ -2656,6 +2664,7 @@ async function sendFollowup() {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
         'X-Team-Token': localStorage.getItem('devpack_team_token') || '',
+        'X-User-Token': (function(){ try{ return JSON.parse(localStorage.getItem('cda-session')||'{}').access_token||''; }catch(e){return '';} })(),
       },
       body: JSON.stringify({ messages: chatHistory })
     });
@@ -3160,6 +3169,16 @@ window.addEventListener('pageshow', function(e) {
     // Reload plan from Supabase to get fresh count
     if (currentUser) {
       loadUserPlan(currentUser.id);
+    }
+  }
+});
+
+window.addEventListener('keydown', function(e) {
+  // Escape key closes upgrade modal if not locked, or focuses sign out
+  if (e.key === 'Escape') {
+    var modal = document.getElementById('upgrade-modal');
+    if (modal && modal.classList.contains('show')) {
+      closeUpgradeModal();
     }
   }
 });
