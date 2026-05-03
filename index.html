@@ -1071,6 +1071,10 @@ async function signInWithGoogle() {
     provider: 'google',
     options: {
       redirectTo: 'https://coredumpanalyzer.com/',
+      queryParams: {
+        prompt: 'select_account',  // Always show account picker
+        access_type: 'offline',
+      }
     }
   });
   if (error) { setAuthMsg(error.message, 'err'); console.error('OAuth error:', error); }
