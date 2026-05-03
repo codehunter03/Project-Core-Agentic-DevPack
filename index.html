@@ -984,49 +984,46 @@ async function initSupabase() {
     }
   });
 
-  // Auth state listener — handles sign in, token refresh, sign out
+  // Auth state listener — single source of truth for all auth events
   supa.auth.onAuthStateChange(async function(event, session) {
-    if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-      var g = document.getElementById('gate');
-      if (g) { g.className = 'hidden'; g.style.display = 'none'; }
-      if (!currentUser) await onAuthSuccess(session.user);
-    }
-    if (session?.user && event === 'INITIAL_SESSION') {
-      // Always refresh pill on reload — even if currentUser already set
-      var g = document.getElementById('gate');
-      if (g) { g.className = 'hidden'; g.style.display = 'none'; }
-      if (!currentUser) {
-        await onAuthSuccess(session.user);
-      } else {
-        // Already logged in — just refresh the usage data
-        await loadUserPlan(session.user.id);
-      }
-    }
-    if (event === 'SIGNED_OUT') {
+    console.log('[CDA] Auth event:', event);
+
+    if (event === 'SIGNED_OUT' || (!session && event === 'INITIAL_SESSION')) {
       currentUser = null;
       var g = document.getElementById('gate');
       if (g) { g.className = ''; g.style.display = ''; }
+      return;
+    }
+
+    if (session?.user && (
+      event === 'SIGNED_IN' ||
+      event === 'TOKEN_REFRESHED' ||
+      event === 'INITIAL_SESSION'
+    )) {
+      // Check 30-min timeout first
+      var lastActive = parseInt(localStorage.getItem(LAST_ACTIVE_KEY) || '0');
+      var elapsed    = lastActive ? Date.now() - lastActive : 0;
+      if (lastActive && elapsed >= TIMEOUT_MS) {
+        try { await supa.auth.signOut({ scope: 'local' }); } catch(e) {}
+        localStorage.removeItem(LAST_ACTIVE_KEY);
+        var g = document.getElementById('gate');
+        if (g) { g.className = ''; g.style.display = ''; }
+        return;
+      }
+
+      var g = document.getElementById('gate');
+      if (g) { g.className = 'hidden'; g.style.display = 'none'; }
+
+      if (!currentUser) {
+        await onAuthSuccess(session.user);
+      } else {
+        // Refresh usage data on token refresh or re-focus
+        await loadUserPlan(session.user.id);
+      }
     }
   });
 
-  // Check for existing session on load
-  try {
-    const { data } = await supa.auth.getSession();
-    if (data?.session?.user) {
-      // [log removed]
-      var g = document.getElementById('gate');
-      if (g) { g.className = 'hidden'; g.style.display = 'none'; }
-      await onAuthSuccess(data.session.user);
-    } else {
-      // [log removed]
-      var g = document.getElementById('gate');
-      if (g) g.className = '';
-    }
-  } catch(e) {
-    console.error('[CDA] Session check error:', e.message);
-    var g = document.getElementById('gate');
-    if (g) g.className = '';
-  }
+  // onAuthStateChange fires INITIAL_SESSION automatically — no need to call getSession separately
 }
 initSupabase();
 
@@ -1159,44 +1156,22 @@ async function onAuthSuccess(user) {
 
 // ── Load user plan — direct Supabase (user can read own row) ──
 async function loadUserPlan(userId) {
-  var attempts = 3;
-  var loaded   = false;
-
-  for (var i = 0; i < attempts; i++) {
-    try {
-      // Ensure session is active before querying
-      const { data: sessionData } = await supa.auth.getSession();
-      if (!sessionData?.session) {
-        await new Promise(function(r){ setTimeout(r, 500); });
-        continue;
-      }
-
-      const { data, error } = await supa
-        .from('users')
-        .select('plan, analyses_used, analyses_limit')
-        .eq('id', userId)
-        .single();
-
-      if (data) {
-        currentPlan   = data.plan           || 'free';
-        analysesUsed  = data.analyses_used  || 0;
-        analysesLimit = data.analyses_limit || 3;
-        loaded = true;
-        break;
-      }
-      if (error) console.log('[CDA] Plan load attempt', i+1, ':', error.message, error.code);
-
-    } catch(e) {
-      console.log('[CDA] Plan load error:', e.message);
+  try {
+    var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/userplan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Team-Token': 'CDA-AUTH' },
+      body: JSON.stringify({ user_id: userId, email: currentUser?.email || '' })
+    });
+    if (resp.ok) {
+      var d = await resp.json();
+      currentPlan   = d.plan           || 'free';
+      analysesUsed  = d.analyses_used  || 0;
+      analysesLimit = d.analyses_limit || 3;
+    } else {
+      currentPlan = 'free'; analysesUsed = 0; analysesLimit = 3;
     }
-
-    if (i < attempts - 1) await new Promise(function(r){ setTimeout(r, 600); });
-  }
-
-  if (!loaded) {
-    currentPlan   = 'free';
-    analysesUsed  = 0;
-    analysesLimit = 3;
+  } catch(e) {
+    currentPlan = 'free'; analysesUsed = 0; analysesLimit = 3;
   }
 
   // Always update pill with real data
