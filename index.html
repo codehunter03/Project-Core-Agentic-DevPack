@@ -1164,6 +1164,13 @@ async function loadUserPlan(userId) {
 
   for (var i = 0; i < attempts; i++) {
     try {
+      // Ensure session is active before querying
+      const { data: sessionData } = await supa.auth.getSession();
+      if (!sessionData?.session) {
+        await new Promise(function(r){ setTimeout(r, 500); });
+        continue;
+      }
+
       const { data, error } = await supa
         .from('users')
         .select('plan, analyses_used, analyses_limit')
@@ -1177,19 +1184,16 @@ async function loadUserPlan(userId) {
         loaded = true;
         break;
       }
-
-      if (error) console.log('[CDA] Plan load attempt', i+1, error.message);
+      if (error) console.log('[CDA] Plan load attempt', i+1, ':', error.message, error.code);
 
     } catch(e) {
       console.log('[CDA] Plan load error:', e.message);
     }
 
-    // Wait 500ms before retry — session token may not be ready yet
-    if (i < attempts - 1) await new Promise(function(r){ setTimeout(r, 500); });
+    if (i < attempts - 1) await new Promise(function(r){ setTimeout(r, 600); });
   }
 
   if (!loaded) {
-    // Still nothing — use defaults
     currentPlan   = 'free';
     analysesUsed  = 0;
     analysesLimit = 3;
