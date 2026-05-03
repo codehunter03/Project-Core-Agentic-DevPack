@@ -1286,16 +1286,26 @@ async function incrementUsage() {
 
 // ── Upgrade modal ─────────────────────────────────────────────
 function showUpgradeModal(locked) {
-  var modal   = document.getElementById('upgrade-modal');
-  var skipBtn = document.getElementById('upgrade-skip-btn');
-  var subText = document.getElementById('upgrade-sub-text');
+  var modal    = document.getElementById('upgrade-modal');
+  var skipBtn  = document.getElementById('upgrade-skip-btn');
+  var closeX   = document.getElementById('upgrade-close-x');
+  var subText  = document.getElementById('upgrade-sub-text');
   modal.classList.add('show');
+
   if (locked) {
-    if (skipBtn) skipBtn.style.display = 'none';
-    if (subText) subText.textContent   = 'You have used all 3 free analyses. Subscribe to continue.';
+    // Forced — no way to dismiss without upgrading or signing out
+    if (skipBtn)  skipBtn.style.display  = 'none';
+    if (closeX)   closeX.style.display   = 'none';
+    if (subText)  subText.textContent    = 'You have used all 3 free analyses. Subscribe to continue.';
+    // Clicking outside modal does nothing
+    modal.onclick = function(e) { if (e.target === modal) e.stopPropagation(); };
   } else {
-    if (skipBtn) skipBtn.style.display = 'block';
-    if (subText) subText.textContent   = "You've used all 3 free analyses";
+    // Voluntary — show close button and Maybe later
+    if (skipBtn)  skipBtn.style.display  = 'block';
+    if (closeX) { closeX.style.display   = 'flex'; }
+    if (subText)  subText.textContent    = 'Unlock unlimited crash analyses';
+    // Clicking outside modal closes it
+    modal.onclick = function(e) { if (e.target === modal) closeUpgradeModal(); };
   }
 }
 function closeUpgradeModal() {
@@ -1308,6 +1318,31 @@ function closeUpgradeModal() {
   document.getElementById('upgrade-modal').classList.remove('show');
 }
 var toolLocked = false;
+
+// On page reload — reset all UI state before Supabase loads
+(function resetUIState() {
+  // Remove any stale overlays from previous session
+  ['workspace-lock','upgrade-banner'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.remove();
+  });
+  // Reset run button to default state
+  var runBtn = document.getElementById('run-btn');
+  if (runBtn) {
+    runBtn.disabled    = false;
+    runBtn.textContent = '🔍 Investigate Crash';
+    runBtn.style.background = '';
+    runBtn.style.color      = '';
+    runBtn.style.cursor     = '';
+    runBtn.onclick          = function() { runAnalysis(); };
+  }
+  // Reset inputs
+  ['bt','src'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.disabled = false; el.style.opacity = ''; el.style.cursor = ''; }
+  });
+})();
+
 function lockToolForUpgrade() {
   toolLocked = true;
   // If DOM not ready yet, wait for it
@@ -1545,7 +1580,15 @@ function toggleGateEye() {}
 <!-- ══ UPGRADE MODAL ══ -->
 <div id="upgrade-modal">
   <div class="upgrade-box">
-    <div class="upgrade-header">
+    <div class="upgrade-header" style="position:relative">
+      <button id="upgrade-close-x" onclick="closeUpgradeModal()"
+        style="position:absolute;top:12px;right:14px;
+        background:rgba(255,255,255,.1);border:none;color:#fff;
+        width:28px;height:28px;border-radius:50%;
+        font-size:1rem;cursor:pointer;display:none;
+        align-items:center;justify-content:center;
+        transition:background .15s;line-height:1"
+        title="Close">✕</button>
       <span class="upgrade-icon">🚀</span>
       <div class="upgrade-title">Upgrade to Pro</div>
       <div class="upgrade-sub" id="upgrade-sub-text">You've used all 3 free analyses</div>
@@ -3195,12 +3238,32 @@ window.addEventListener('pageshow', function(e) {
 });
 
 window.addEventListener('keydown', function(e) {
-  // Escape key closes upgrade modal if not locked, or focuses sign out
   if (e.key === 'Escape') {
     var modal = document.getElementById('upgrade-modal');
     if (modal && modal.classList.contains('show')) {
       closeUpgradeModal();
     }
+  }
+});
+
+// ── Back/Forward button handler ───────────────────────────────
+// Prevents blank page when user hits browser back button
+window.addEventListener('popstate', function(e) {
+  // If gate is visible — user navigated back to login — that's fine
+  var gate = document.getElementById('gate');
+  if (gate && gate.className !== 'hidden' && gate.style.display !== 'none') return;
+
+  // If user navigated back while logged in — just stay on tool
+  // Push state back so back button doesn't leave the page
+  if (currentUser) {
+    history.pushState({ page: 'tool' }, '', window.location.pathname);
+  }
+});
+
+// Push initial state so back button works properly
+window.addEventListener('load', function() {
+  if (history.state === null) {
+    history.pushState({ page: 'tool' }, '', window.location.pathname);
   }
 });
 
