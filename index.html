@@ -1157,36 +1157,35 @@ async function onAuthSuccess(user) {
   try { localStorage.setItem('cda_user_email', user.email || ''); } catch(e) {}
 }
 
-// ── Load user plan ────────────────────────────────────────────
+// ── Load user plan — via Lambda (bypasses RLS) ────────────────
 async function loadUserPlan(userId) {
   try {
-    const { data, error } = await supa
-      .from('users')
-      .select('plan, analyses_used, analyses_limit')
-      .eq('id', userId)
-      .single();
+    // Use Lambda /stats route which uses service_role key — bypasses RLS
+    var sess = {};
+    try { sess = JSON.parse(localStorage.getItem('cda-sb-session') || '{}'); } catch(e) {}
 
-    if (data) {
-      currentPlan   = data.plan           || 'free';
-      analysesUsed  = data.analyses_used  || 0;
-      analysesLimit = data.analyses_limit || 3;
+    var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/userplan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key':    'server-managed',
+        'X-Team-Token': 'CDA-AUTH',
+      },
+      body: JSON.stringify({ user_id: userId, email: currentUser?.email || '' })
+    });
+
+    if (resp.ok) {
+      var d = await resp.json();
+      currentPlan   = d.plan           || 'free';
+      analysesUsed  = d.analyses_used  || 0;
+      analysesLimit = d.analyses_limit || 3;
     } else {
-      // No user row — create one now
-      console.log('[CDA] Creating user record...');
-      await supa.from('users').upsert({
-        id:              userId,
-        email:           currentUser?.email || '',
-        plan:            'free',
-        analyses_used:   0,
-        analyses_limit:  3,
-      }, { onConflict: 'id' });
+      // Fallback defaults
       currentPlan   = 'free';
       analysesUsed  = 0;
       analysesLimit = 3;
     }
   } catch(e) {
-    console.log('[CDA] Could not load plan:', e.message);
-    // Use safe defaults
     currentPlan   = 'free';
     analysesUsed  = 0;
     analysesLimit = 3;
