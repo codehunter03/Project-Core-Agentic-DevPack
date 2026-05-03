@@ -2,6 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com;
+    font-src https://fonts.gstatic.com;
+    connect-src 'self' https://sympib3n8l.execute-api.us-east-1.amazonaws.com https://qhwcvojiqzjlzlqqhvvo.supabase.co https://cdn.jsdelivr.net;
+    img-src 'self' data: https:;
+    frame-ancestors 'none';
+  ">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -956,7 +967,7 @@ async function initSupabase() {
 
   // Auth state listener — handles sign in, token refresh, sign out
   supa.auth.onAuthStateChange(async function(event, session) {
-    console.log('[CDA]', event, session?.user?.email || '');
+    // [log removed]
     if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
       var g = document.getElementById('gate');
       if (g) { g.className = 'hidden'; g.style.display = 'none'; }
@@ -973,12 +984,12 @@ async function initSupabase() {
   try {
     const { data } = await supa.auth.getSession();
     if (data?.session?.user) {
-      console.log('[CDA] Session found:', data.session.user.email);
+      // [log removed]
       var g = document.getElementById('gate');
       if (g) { g.className = 'hidden'; g.style.display = 'none'; }
       await onAuthSuccess(data.session.user);
     } else {
-      console.log('[CDA] No session — showing login');
+      // [log removed]
       var g = document.getElementById('gate');
       if (g) g.className = '';
     }
@@ -1098,7 +1109,7 @@ async function onAuthSuccess(user) {
   if (gate) { gate.className = 'hidden'; gate.style.display = 'none'; }
 
   // Set team token for Lambda
-  localStorage.setItem('devpack_team_token', 'DevPackTeam2024!');
+  localStorage.setItem('devpack_team_token', 'CDA-AUTH');
 
   // Update header badge (creates pill element)
   updateUserBadge(user.email);
@@ -2446,7 +2457,7 @@ async function runAnalysis() {
     var lastRaw  = '';
     var maxRetries = 3;
     var LAMBDA   = 'https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze';
-    var teamTok  = 'DevPackTeam2024!';
+    var teamTok  = 'CDA-AUTH';
 
     // Single call with smart model selection — Lambda handles retries internally
     lg('🤖 Analyzing with AI (this may take 20-40s for complex crashes)...', 'info');
@@ -2455,14 +2466,14 @@ async function runAnalysis() {
     var isComplex = bt.length > 3000 || src.length > 6000;
     if (isComplex) lg('📊 Complex crash detected — using Sonnet for better accuracy...', 'info');
 
-    console.log('[CDA] Sending to Lambda. apiKey:', apiKey.slice(0,15), 'teamTok:', !!teamTok);
+    // [log removed]
 
     var resp = await fetch(LAMBDA, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
-        'X-Team-Token': 'DevPackTeam2024!',
+        'X-Team-Token': 'CDA-AUTH',
       },
       body: JSON.stringify({
         backtrace:       bt,
@@ -2475,7 +2486,7 @@ async function runAnalysis() {
     });
 
     // Log actual HTTP status for debugging
-    console.log('[CDA] Lambda response status:', resp.status);
+    // [log removed]
 
     if (!resp.ok) {
       var errText = await resp.text().catch(function(){ return ''; });
@@ -2668,7 +2679,7 @@ async function sendFollowup() {
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
-        'X-Team-Token': 'DevPackTeam2024!',
+        'X-Team-Token': 'CDA-AUTH',
       },
       body: JSON.stringify({ messages: chatHistory })
     });
@@ -2730,7 +2741,7 @@ document.getElementById('bt').addEventListener('input', function() {
   // Debounce: wait 1s after user stops typing/pasting
   advisorDebounce = setTimeout(function() {
     var apiKey    = 'server-managed';
-    var teamToken = 'DevPackTeam2024!';
+    var teamToken = 'CDA-AUTH';
 
     if (!apiKey) {
       if (typing) typing.classList.remove('show');
@@ -2834,7 +2845,7 @@ async function runAdvisor() {
   var rerunBtn  = document.getElementById('advisor-rerun-btn');
 
   if (!bt || bt.length < 20) return;
-  var teamToken = 'DevPackTeam2024!';
+  var teamToken = 'CDA-AUTH';
   if (!teamToken) return; // Not logged in yet
 
   // Show scanning state
@@ -3064,7 +3075,7 @@ async function runSelfTest() {
   try {
     var pingResp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/health', {
       method: 'GET',
-      headers: { 'X-Api-Key': apiKey, 'X-Team-Token': 'DevPackTeam2024!' }
+      headers: { 'X-Api-Key': apiKey, 'X-Team-Token': 'CDA-AUTH' }
     });
 
     if (pingResp.status === 200) {
@@ -3100,7 +3111,7 @@ async function runSelfTest() {
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
-        'X-Team-Token': 'DevPackTeam2024!',
+        'X-Team-Token': 'CDA-AUTH',
       },
       body: JSON.stringify({
         backtrace: ST_BACKTRACE,
@@ -3424,7 +3435,7 @@ async function sendFeedback(worked) {
   if (status) status.textContent = 'Saving...';
 
   try {
-    var teamToken = 'DevPackTeam2024!';
+    var teamToken = 'CDA-AUTH';
     var apiKey    = 'server-managed'    || '';
 
     var payload = {
