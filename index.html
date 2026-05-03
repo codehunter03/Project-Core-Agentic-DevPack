@@ -1139,6 +1139,9 @@ async function onAuthSuccess(user) {
   // Show welcome toast
   showWelcomeToast(user.email);
 
+  // Start 30-min inactivity timer
+  startActivityTracking();
+
   // Store session info
   sessionStorage.setItem('cda_logged_in', '1');
   try { localStorage.setItem('cda_user_email', user.email || ''); } catch(e) {}
@@ -1196,6 +1199,73 @@ async function loadUserPlan(userId) {
 }
 
 // ── Update header with user info ──────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  SESSION TIMEOUT — 30 minutes inactivity
+// ══════════════════════════════════════════════════════════════
+var TIMEOUT_MS      = 30 * 60 * 1000; // 30 minutes
+var LAST_ACTIVE_KEY = 'cda-last-active';
+var timeoutTimer    = null;
+
+function updateLastActive() {
+  localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString());
+}
+
+function checkSessionTimeout() {
+  if (!currentUser) return; // not logged in
+  var last = parseInt(localStorage.getItem(LAST_ACTIVE_KEY) || '0');
+  if (!last) { updateLastActive(); return; }
+  var elapsed = Date.now() - last;
+  if (elapsed >= TIMEOUT_MS) {
+    console.log('[CDA] Session timed out after 30min inactivity');
+    showTimeoutToast();
+    setTimeout(function() { signOut(); }, 2000);
+  }
+}
+
+function startActivityTracking() {
+  // Update last active on any user interaction
+  var events = ['mousedown','keydown','touchstart','scroll','click'];
+  events.forEach(function(ev) {
+    document.addEventListener(ev, function() {
+      updateLastActive();
+      resetTimeoutTimer();
+    }, { passive: true });
+  });
+
+  // Start the countdown
+  updateLastActive();
+  resetTimeoutTimer();
+}
+
+function resetTimeoutTimer() {
+  if (timeoutTimer) clearTimeout(timeoutTimer);
+  timeoutTimer = setTimeout(function() {
+    showTimeoutToast();
+    setTimeout(function() { if (currentUser) signOut(); }, 3000);
+  }, TIMEOUT_MS);
+}
+
+function showTimeoutToast() {
+  var existing = document.getElementById('timeout-toast');
+  if (existing) return;
+  var toast = document.createElement('div');
+  toast.id = 'timeout-toast';
+  toast.style.cssText = [
+    'position:fixed;bottom:24px;left:50%;',
+    'transform:translateX(-50%);',
+    'background:#1a1f2e;border:1px solid #e3b341;',
+    'border-radius:10px;padding:.8rem 1.4rem;',
+    'font-size:.82rem;color:#e6edf3;',
+    'box-shadow:0 8px 24px rgba(0,0,0,.5);',
+    'z-index:99999;text-align:center;',
+    'animation:slideup .3s ease;',
+  ].join('');
+  toast.innerHTML =
+    '<span style="color:#e3b341;margin-right:8px">⏱</span>' +
+    'Session expired — signing you out for security...';
+  document.body.appendChild(toast);
+}
+
 function showWelcomeToast(email) {
   // Don't show on very first login (no previous session key)
   var isReturn = !!localStorage.getItem('cda_visited');
@@ -1512,6 +1582,10 @@ function goToCheckout() {
 
 // ── Sign out ──────────────────────────────────────────────────
 async function signOut() {
+  // Clear timeout timer
+  if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
+  localStorage.removeItem(LAST_ACTIVE_KEY);
+
   // Hide overlays immediately so button is responsive
   ['workspace-lock','upgrade-banner','upgrade-modal'].forEach(function(id) {
     var el = document.getElementById(id);
