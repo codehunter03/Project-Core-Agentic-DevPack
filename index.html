@@ -1359,37 +1359,24 @@ async function incrementUsage() {
   if (currentPlan === 'pro' || !currentUser) return;
 
   try {
-    // Step 1: Read fresh value from Supabase (source of truth)
-    const { data: current } = await supa
-      .from('users')
-      .select('analyses_used, analyses_limit')
-      .eq('id', currentUser.id)
-      .single();
-
-    var freshUsed  = (current?.analyses_used  ?? analysesUsed);
-    var freshLimit = (current?.analyses_limit ?? analysesLimit);
-    var newCount   = freshUsed + 1;
-
-    // Step 2: Write incremented value back
-    await supa
-      .from('users')
-      .update({ analyses_used: newCount })
-      .eq('id', currentUser.id);
-
-    // Step 3: Update local state from server values
-    analysesUsed  = newCount;
-    analysesLimit = freshLimit;
-    console.log('[CDA] Usage updated:', analysesUsed, '/', analysesLimit);
-
+    var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/increment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Team-Token': 'CDA-AUTH' },
+      body: JSON.stringify({ user_id: currentUser.id })
+    });
+    if (resp.ok) {
+      var d = await resp.json();
+      analysesUsed  = d.analyses_used  || analysesUsed + 1;
+      analysesLimit = d.analyses_limit || analysesLimit;
+    } else {
+      analysesUsed++;
+    }
   } catch(e) {
-    console.log('[CDA] Usage update error:', e.message);
-    analysesUsed++; // fallback: at least increment locally
+    analysesUsed++;
   }
 
-  // Always update pill after
   updateUsagePill();
 
-  // Show locked modal if at limit
   if (analysesUsed >= analysesLimit) {
     setTimeout(function() {
       if (currentPlan !== 'pro') showUpgradeModal(true);
