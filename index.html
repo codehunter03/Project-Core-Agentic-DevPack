@@ -1316,10 +1316,9 @@ function updateUserBadge(email) {
   }
 
   // Set display name
+  // Name hidden — initials only in avatar
   var nameEl = document.getElementById('user-name');
-  if (nameEl) {
-    nameEl.textContent = email.split('@')[0];
-  }
+  if (nameEl) nameEl.style.display = 'none';
 
   // Show usage pill
   var pill = document.getElementById('usage-pill');
@@ -1349,7 +1348,7 @@ function updateUsagePill() {
     pill.style.borderColor = left > 0 ? '#e3b341' : '#ff3b30';
     pill.style.background  = left > 0 ? 'rgba(227,179,65,.08)' : 'rgba(255,59,48,.08)';
     // Show upgrade button when 1 or fewer left — but never auto-open modal here
-    if (upgrBtn) upgrBtn.style.display = left <= 1 ? 'block' : 'none';
+    if (upgrBtn) upgrBtn.style.display = 'block'; // always visible for free users
   }
 }
 
@@ -1757,14 +1756,14 @@ function toggleGateEye() {}
         font-size:.68rem;font-weight:700;color:#fff;flex-shrink:0;
         cursor:default;user-select:none;
       "></div>
-      <span id="user-name" style="font-size:.72rem;color:var(--t2);max-width:120px;
-        overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <span id="user-name" style="display:none"></span>
     </div>
     <span class="pill" id="key-badge" style="display:none"></span>
-    <button onclick="showUpgradeModal(true)" id="upgrade-btn" style="display:none;
-      background:linear-gradient(135deg,#1f6feb,#8957e5);border:none;color:#fff;
-      border-radius:6px;padding:5px 14px;font-size:.72rem;font-weight:700;
-      cursor:pointer;font-family:inherit;z-index:1001;position:relative">⚡ Upgrade Pro</button>
+    <button onclick="showUpgradeModal(false)" id="upgrade-btn" style="display:none;
+      background:none;border:1px solid #1f6feb;color:#388bfd;
+      border-radius:6px;padding:4px 12px;font-size:.70rem;font-weight:600;
+      cursor:pointer;font-family:inherit;z-index:1001;position:relative;
+      transition:all .15s">⚡ Pro</button>
     <button id="signout-btn" title="Sign out"
       onclick="(function(){
         try{document.querySelectorAll('#workspace-lock,#upgrade-banner,#upgrade-modal').forEach(function(e){e.remove();});}catch(ex){}
