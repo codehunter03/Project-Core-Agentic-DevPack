@@ -1159,24 +1159,37 @@ async function onAuthSuccess(user) {
 
 // ── Load user plan — direct Supabase (user can read own row) ──
 async function loadUserPlan(userId) {
-  try {
-    const { data, error } = await supa
-      .from('users')
-      .select('plan, analyses_used, analyses_limit')
-      .eq('id', userId)
-      .single();
+  var attempts = 3;
+  var loaded   = false;
 
-    if (data) {
-      currentPlan   = data.plan           || 'free';
-      analysesUsed  = data.analyses_used  || 0;
-      analysesLimit = data.analyses_limit || 3;
-    } else {
-      // No row — Lambda will create it on first analysis
-      currentPlan   = 'free';
-      analysesUsed  = 0;
-      analysesLimit = 3;
+  for (var i = 0; i < attempts; i++) {
+    try {
+      const { data, error } = await supa
+        .from('users')
+        .select('plan, analyses_used, analyses_limit')
+        .eq('id', userId)
+        .single();
+
+      if (data) {
+        currentPlan   = data.plan           || 'free';
+        analysesUsed  = data.analyses_used  || 0;
+        analysesLimit = data.analyses_limit || 3;
+        loaded = true;
+        break;
+      }
+
+      if (error) console.log('[CDA] Plan load attempt', i+1, error.message);
+
+    } catch(e) {
+      console.log('[CDA] Plan load error:', e.message);
     }
-  } catch(e) {
+
+    // Wait 500ms before retry — session token may not be ready yet
+    if (i < attempts - 1) await new Promise(function(r){ setTimeout(r, 500); });
+  }
+
+  if (!loaded) {
+    // Still nothing — use defaults
     currentPlan   = 'free';
     analysesUsed  = 0;
     analysesLimit = 3;
@@ -1320,13 +1333,13 @@ function updateUserBadge(email) {
   var nameEl = document.getElementById('user-name');
   if (nameEl) nameEl.style.display = 'none';
 
-  // Show usage pill
+  // Show usage pill with loading state
   var pill = document.getElementById('usage-pill');
   if (pill) {
     pill.style.display = '';
-    pill.textContent   = '...';
-    pill.className     = 'pill';
+    pill.textContent   = 'loading...';
     pill.style.color   = '#8b949e';
+    pill.className     = 'pill';
   }
 }
 
