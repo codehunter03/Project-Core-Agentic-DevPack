@@ -1405,12 +1405,11 @@ function lockToolForUpgrade() {
 
 // ── Stripe checkout ───────────────────────────────────────────
 function goToCheckout() {
-  // Redirect to Stripe payment link (you'll add this after creating Stripe product)
-  var stripeLink = 'https://buy.stripe.com/REPLACE_WITH_YOUR_STRIPE_LINK';
-  if (currentUser) {
-    stripeLink += '?prefilled_email=' + encodeURIComponent(currentUser.email);
+  var link = 'https://coredumpanalyzer.lemonsqueezy.com/checkout/buy/278346b0-5f76-41af-87db-784d3c8a1548';
+  if (currentUser && currentUser.email) {
+    link += '?checkout[email]=' + encodeURIComponent(currentUser.email);
   }
-  window.open(stripeLink, '_blank');
+  window.open(link, '_blank');
 }
 
 // ── Sign out ──────────────────────────────────────────────────
