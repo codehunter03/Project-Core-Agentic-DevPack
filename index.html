@@ -1157,30 +1157,21 @@ async function onAuthSuccess(user) {
   try { localStorage.setItem('cda_user_email', user.email || ''); } catch(e) {}
 }
 
-// ── Load user plan — via Lambda (bypasses RLS) ────────────────
+// ── Load user plan — direct Supabase (user can read own row) ──
 async function loadUserPlan(userId) {
   try {
-    // Use Lambda /stats route which uses service_role key — bypasses RLS
-    var sess = {};
-    try { sess = JSON.parse(localStorage.getItem('cda-sb-session') || '{}'); } catch(e) {}
+    const { data, error } = await supa
+      .from('users')
+      .select('plan, analyses_used, analyses_limit')
+      .eq('id', userId)
+      .single();
 
-    var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/userplan', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key':    'server-managed',
-        'X-Team-Token': 'CDA-AUTH',
-      },
-      body: JSON.stringify({ user_id: userId, email: currentUser?.email || '' })
-    });
-
-    if (resp.ok) {
-      var d = await resp.json();
-      currentPlan   = d.plan           || 'free';
-      analysesUsed  = d.analyses_used  || 0;
-      analysesLimit = d.analyses_limit || 3;
+    if (data) {
+      currentPlan   = data.plan           || 'free';
+      analysesUsed  = data.analyses_used  || 0;
+      analysesLimit = data.analyses_limit || 3;
     } else {
-      // Fallback defaults
+      // No row — Lambda will create it on first analysis
       currentPlan   = 'free';
       analysesUsed  = 0;
       analysesLimit = 3;
