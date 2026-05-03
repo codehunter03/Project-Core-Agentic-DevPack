@@ -986,11 +986,21 @@ async function initSupabase() {
 
   // Auth state listener — handles sign in, token refresh, sign out
   supa.auth.onAuthStateChange(async function(event, session) {
-    // [log removed]
-    if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+    if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
       var g = document.getElementById('gate');
       if (g) { g.className = 'hidden'; g.style.display = 'none'; }
       if (!currentUser) await onAuthSuccess(session.user);
+    }
+    if (session?.user && event === 'INITIAL_SESSION') {
+      // Always refresh pill on reload — even if currentUser already set
+      var g = document.getElementById('gate');
+      if (g) { g.className = 'hidden'; g.style.display = 'none'; }
+      if (!currentUser) {
+        await onAuthSuccess(session.user);
+      } else {
+        // Already logged in — just refresh the usage data
+        await loadUserPlan(session.user.id);
+      }
     }
     if (event === 'SIGNED_OUT') {
       currentUser = null;
@@ -1745,8 +1755,6 @@ function toggleGateEye() {}
     </div>
   </div>
   <div class="hbadges">
-    <span class="pill" style="color:#56d364;border-color:#238636;background:rgba(35,134,54,.1)">v1.0</span>
-    <span class="pill" id="model-badge" style="color:#8b949e;border-color:#30363d;background:#161b22">claude-sonnet</span>
     <span class="pill" id="usage-pill" style="display:none"></span>
     <div id="user-badge" style="display:none;align-items:center;gap:8px">
       <div id="user-avatar" style="
