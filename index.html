@@ -2622,7 +2622,10 @@ async function runAnalysis() {
 
     // Detect complexity to choose model upfront
     var isComplex = bt.length > 3000 || src.length > 6000;
-    if (isComplex) lg('📊 Complex crash detected — using Sonnet for better accuracy...', 'info');
+    if (isComplex) lg('📊 Complex crash detected — using enhanced analysis...', 'info');
+
+    // Truncate large backtraces to keep Anthropic response fast
+    var btSend = bt.length > 4000 ? bt.slice(0, 4000) + '\n...[truncated for analysis]' : bt;
 
     // [log removed]
 
@@ -2634,7 +2637,7 @@ async function runAnalysis() {
         'X-Team-Token': 'CDA-AUTH',
       },
       body: JSON.stringify({
-        backtrace:       bt,
+        backtrace:       btSend,
         source:          src,
         filename:        curFname,
         additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
