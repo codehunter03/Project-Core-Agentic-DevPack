@@ -1962,7 +1962,7 @@ void causeCrash() {
       </div>
 
       <!-- Correlations pane -->
-      <div class="tpane" id="tp-correlations" style="display:none">
+      <div class="tpane" id="tp-correlations">
         <div id="corr-panel" style="padding:.5rem 0">
           <div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">
             Run an analysis first to see correlations
@@ -3498,7 +3498,12 @@ async function loadCorrelations() {
 
     if (!d.similar || d.similar.length === 0) {
       html += '<div style="color:var(--t3);font-size:.82rem;padding:1.5rem;text-align:center;border:1px dashed var(--s4);border-radius:8px">';
-      html += '🔍 No similar historical crashes found yet.<br><span style="font-size:.75rem">As more crashes are analyzed, patterns will emerge here.</span></div>';
+      html += '<div style="font-size:1.5rem;margin-bottom:.5rem">🔍</div>';
+      html += '<div style="color:var(--t2);font-weight:600;margin-bottom:.4rem">No similar crashes found yet</div>';
+      html += '<div style="font-size:.76rem">This is crash family <strong style="color:#d2a8ff">' + (d.crash_family||'Unknown') + '</strong> — seen <strong>' + (d.total_seen||0) + '</strong> time(s) total.<br>';
+      html += 'Correlations appear after multiple crashes of the same type are analyzed.<br>';
+      html += 'Run more analyses to build your team\'s crash pattern database.</div>';
+      html += '</div>';
     } else {
       d.similar.forEach(function(item, i) {
         var pct    = Math.round((item.similarity_score || 0) * 100);
