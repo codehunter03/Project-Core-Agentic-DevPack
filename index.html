@@ -3072,10 +3072,7 @@ async function runAdvisor() {
 
     renderAdvisorList(files);
 
-    if (note && parsed.summary) {
-      note.textContent = '💡 ' + parsed.summary;
-      note.style.display = 'block';
-    }
+    if (note) { note.style.display = 'none'; }
 
     advisorRan = true;
 
