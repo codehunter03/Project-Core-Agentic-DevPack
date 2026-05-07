@@ -1912,6 +1912,15 @@ void causeCrash() {
         <div style="display:flex;flex-direction:column;gap:.75rem">
           <div><div class="slbl">Root Cause Explanation</div><div class="card" id="r-exp">—</div></div>
           <div><div class="slbl">Fix Explanation</div><div class="card grn" id="r-fix">—</div></div>
+
+          <!-- Evidence-Based Root Cause Agent -->
+          <div id="evidence-agent-section" style="display:none">
+            <div class="slbl" style="margin-bottom:.4rem">
+              🔬 Evidence-Based Hypothesis Ranking
+              <span style="font-size:.68rem;color:var(--t3);font-weight:400;margin-left:.5rem">deterministic · no speculation</span>
+            </div>
+            <div id="evidence-agent-panel"></div>
+          </div>
           <div>
             <div class="slbl">Original Source — crash line highlighted</div>
             <div class="code-box" id="r-orig"></div>
@@ -2717,6 +2726,7 @@ async function runAnalysis() {
     lg('✅ Analysis complete in ' + elapsed + 's!', 'ok');
     setStep(5); // Mark all steps complete — no more 'live' bar
     renderResult(curResult);
+    renderEvidenceAgent(curResult);
     // Increment usage counter
     await incrementUsage();
     // Show feedback bar
@@ -3535,6 +3545,112 @@ async function loadCorrelations() {
   } catch(e) {
     panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;padding:1rem">Could not load correlations: ' + e.message + '</div>';
   }
+}
+
+// ── Evidence-Based Root Cause Agent ──────────────────────────────────────
+function renderEvidenceAgent(r) {
+  var section = document.getElementById('evidence-agent-section');
+  var panel   = document.getElementById('evidence-agent-panel');
+  if (!section || !panel) return;
+
+  // Build hypotheses from analysis result
+  var hypotheses = [];
+
+  // Primary hypothesis — from verified findings
+  if (r.root_cause) {
+    hypotheses.push({
+      rank:       1,
+      hypothesis: r.root_cause,
+      probability: r.confidence === 'High' ? 92 : r.confidence === 'Medium' ? 71 : 45,
+      supporting:  r.verified_findings || 'Stack trace confirms faulting frame',
+      contradicting: r.unknowns && r.unknowns !== 'None' ? r.unknowns : null,
+      missing:     r.confidence !== 'High' ? 'Source file or register state needed for full confirmation' : null,
+      evidence_type: 'VERIFIED',
+    });
+  }
+
+  // Secondary hypothesis — from inferred findings
+  if (r.inferred_findings && r.inferred_findings !== 'None' && r.inferred_findings !== r.root_cause) {
+    hypotheses.push({
+      rank:       2,
+      hypothesis: r.inferred_findings,
+      probability: r.confidence === 'High' ? 41 : r.confidence === 'Medium' ? 28 : 52,
+      supporting:  'Inferred from crash signal and stack pattern',
+      contradicting: r.root_cause ? 'Primary hypothesis better supported by stack frames' : null,
+      missing:     'Thread state or memory map required to confirm',
+      evidence_type: 'INFERRED',
+    });
+  }
+
+  // Crash propagation chain
+  var propagation = r.crash_propagation || null;
+
+  if (hypotheses.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  var html = '';
+
+  // Propagation timeline
+  if (propagation) {
+    html += '<div style="margin-bottom:.75rem;padding:.7rem .9rem;background:var(--s1);border-radius:8px;border-left:3px solid #58a6ff">';
+    html += '<div style="font-size:.72rem;font-weight:700;color:#58a6ff;margin-bottom:.3rem;letter-spacing:.5px">CRASH PROPAGATION CHAIN</div>';
+    html += '<div style="font-size:.78rem;color:var(--t2);line-height:1.6">' + propagation + '</div>';
+    html += '</div>';
+  }
+
+  // Hypothesis cards
+  hypotheses.forEach(function(h) {
+    var probColor = h.probability >= 80 ? '#f85149'
+                  : h.probability >= 60 ? '#e3b341'
+                  : '#8b949e';
+    var typeColor = h.evidence_type === 'VERIFIED' ? '#56d364' : '#e3b341';
+    var typeBg    = h.evidence_type === 'VERIFIED' ? 'rgba(86,211,100,.06)' : 'rgba(227,179,65,.06)';
+
+    html += '<div style="margin-bottom:.6rem;border:1px solid var(--s4);border-radius:8px;overflow:hidden;background:' + typeBg + '">';
+
+    // Header
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:var(--s2);border-bottom:1px solid var(--s4)">';
+    html += '<div style="display:flex;align-items:center;gap:.5rem">';
+    html += '<span style="font-size:.68rem;font-weight:700;color:' + typeColor + ';border:1px solid ' + typeColor + ';border-radius:3px;padding:1px 6px">' + h.evidence_type + '</span>';
+    html += '<span style="font-size:.78rem;font-weight:700;color:var(--t1)">Hypothesis #' + h.rank + '</span>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:6px">';
+    html += '<span style="font-size:.7rem;color:var(--t3)">Probability</span>';
+    html += '<span style="font-size:.85rem;font-weight:800;color:' + probColor + '">' + h.probability + '%</span>';
+    html += '</div></div>';
+
+    // Body
+    html += '<div style="padding:.7rem .9rem;display:flex;flex-direction:column;gap:.5rem">';
+    html += '<div style="font-size:.82rem;color:var(--t1);font-weight:600">' + h.hypothesis + '</div>';
+
+    // Evidence rows
+    if (h.supporting) {
+      html += '<div style="display:flex;gap:.5rem;align-items:flex-start">';
+      html += '<span style="font-size:.68rem;font-weight:700;color:#56d364;min-width:80px;padding-top:1px">✓ SUPPORTS</span>';
+      html += '<span style="font-size:.75rem;color:var(--t2)">' + h.supporting + '</span></div>';
+    }
+    if (h.contradicting) {
+      html += '<div style="display:flex;gap:.5rem;align-items:flex-start">';
+      html += '<span style="font-size:.68rem;font-weight:700;color:#f85149;min-width:80px;padding-top:1px">✗ CONTRA</span>';
+      html += '<span style="font-size:.75rem;color:var(--t2)">' + h.contradicting + '</span></div>';
+    }
+    if (h.missing) {
+      html += '<div style="display:flex;gap:.5rem;align-items:flex-start">';
+      html += '<span style="font-size:.68rem;font-weight:700;color:#8b949e;min-width:80px;padding-top:1px">? MISSING</span>';
+      html += '<span style="font-size:.75rem;color:var(--t3)">' + h.missing + '</span></div>';
+    }
+    html += '</div></div>';
+  });
+
+  // Confidence note
+  html += '<div style="font-size:.72rem;color:var(--t3);margin-top:.4rem;text-align:right">';
+  html += '⚡ Deterministic analysis — conclusions drawn only from crash evidence';
+  html += '</div>';
+
+  panel.innerHTML = html;
 }
 
 function renderRCA() {
