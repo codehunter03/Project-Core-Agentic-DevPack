@@ -938,7 +938,12 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 // ── Pre-check: show login immediately if no session ──────────────────────
 (function() {
   try {
-    // Supabase stores session under our storageKey
+    // If returning from Google OAuth — hash has access_token
+    // Don't show login — let Supabase SDK process the hash
+    var hash = window.location.hash || '';
+    if (hash.includes('access_token') || hash.includes('error_description')) return;
+
+    // Check stored session validity
     var raw = localStorage.getItem('cda-sb-session');
     var ok  = false;
     if (raw) {
