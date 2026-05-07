@@ -2479,7 +2479,10 @@ function renderResult(r) {
   document.getElementById('s-rc').textContent=r.root_cause||'—';
   document.getElementById('s-badges').innerHTML=`
     <span class="pill" style="color:${sc.tx};border-color:${sc.bdr};background:${sc.bg}">🔴 ${sev}</span>
-    <span class="pill" style="color:${CONF_C[r.confidence]||'#aaa'};border-color:${CONF_C[r.confidence]||'#aaa'};background:transparent">Confidence: ${r.confidence}</span>
+    <span class="pill" style="color:${CONF_C[r.confidence]||'#aaa'};border-color:${CONF_C[r.confidence]||'#aaa'};background:transparent;font-weight:600" title="${r.confidence==='High'?'Source file matches backtrace — high fix accuracy':r.confidence==='Medium'?'Partial context — verify fix before applying':'Limited context — upload source file for better accuracy'}">
+      ${r.confidence==='High'?'⬤⬤⬤':r.confidence==='Medium'?'⬤⬤◯':'⬤◯◯'} ${r.confidence||'Unknown'}
+      &nbsp;·&nbsp;${r.confidence==='High'?'Source verified':'Upload source for better accuracy'}
+    </span>
     ${r.faulting_function?`<span class="pill" style="color:#d2a8ff;border-color:#d2a8ff;background:transparent">fn: ${r.faulting_function}</span>`:''}
     ${r.faulting_line?`<span class="pill" style="color:#58a6ff;border-color:#58a6ff;background:transparent">line: ${r.faulting_line}</span>`:''}
   `;
