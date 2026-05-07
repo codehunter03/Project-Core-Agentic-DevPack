@@ -3464,10 +3464,11 @@ function escRCA(s) {
 async function loadCorrelations() {
   var panel = document.getElementById('corr-panel');
   if (!panel) return;
-  if (!curResult || !curResult.bug_category) {
+  if (!curResult) {
     panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">Run an analysis first to see correlations.</div>';
     return;
   }
+  var bugCat = curResult.bug_category || curResult.bugCategory || 'Other';
   panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">⏳ Searching historical crash database...</div>';
 
   try {
@@ -3475,7 +3476,7 @@ async function loadCorrelations() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Team-Token': 'CDA-AUTH' },
       body: JSON.stringify({
-        bug_category: curResult.bug_category,
+        bug_category: bugCat,
         signal:       curResult.signal || '',
         root_cause:   curResult.root_cause || '',
       })
