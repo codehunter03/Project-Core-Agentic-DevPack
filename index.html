@@ -2629,8 +2629,13 @@ async function runAnalysis() {
 
     // [log removed]
 
+    // Fetch with 28s timeout (just under API Gateway 29s limit)
+    var controller = new AbortController();
+    var timeoutId  = setTimeout(function() { controller.abort(); }, 28000);
+
     var resp = await fetch(LAMBDA, {
-      method: 'POST',
+      method:  'POST',
+      signal:  controller.signal,
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key':    apiKey,
@@ -2645,6 +2650,7 @@ async function runAnalysis() {
         attempt:         1,
       }),
     });
+    clearTimeout(timeoutId);
 
     // Log actual HTTP status for debugging
     // [log removed]
@@ -2710,6 +2716,11 @@ async function runAnalysis() {
     }
 
   } catch(err) {
+    if (err.name === 'AbortError') {
+      showErr('Analysis timed out — try with a shorter backtrace or source file.');
+      lg('❌ Request timed out after 28s', 'err');
+      document.getElementById('empty').style.display='flex';
+    } else {
     lg('❌ '+err.message,'err');
     let hint='';
     if(err.message.includes('401'))       hint=' — Analysis service error. Please try again.';
@@ -2720,6 +2731,7 @@ async function runAnalysis() {
     else if(err.message.includes('overloaded')) hint=' — Anthropic API is busy. Wait 30 seconds and retry.';
     showErr(err.message+hint);
     document.getElementById('empty').style.display='flex';
+    }
   } finally {
     // Only re-enable run button if user still has analyses left
     if (currentPlan === 'pro' || analysesUsed < analysesLimit) {
@@ -2855,6 +2867,12 @@ async function sendFollowup() {
     var data = await resp.json();
     var assistantMsg = data.result;
     var isDeflection = assistantMsg && assistantMsg.includes('I can only help with questions related to this crash');
+
+    // Mark the user message as off-topic too so both are excluded from RCA
+    if (isDeflection) {
+      var lastUserMsg = chatHistory[chatHistory.length - 1];
+      if (lastUserMsg && lastUserMsg.role === 'user') lastUserMsg.offTopic = true;
+    }
     chatHistory.push({ role:'assistant', content: assistantMsg, offTopic: isDeflection });
 
     if (typing) typing.classList.remove('show');
