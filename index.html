@@ -978,9 +978,10 @@ async function initSupabase() {
     auth: {
       autoRefreshToken:   true,
       persistSession:     true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: true,  // Handles OAuth redirect hash
       storageKey:         SESSION_KEY,
       storage:            window.localStorage,
+      flowType:           'implicit',  // Ensure hash-based OAuth works
     }
   });
 
@@ -2026,14 +2027,6 @@ void causeCrash() {
 ">
   CoreDumpAnalyzer &mdash; Core Dump Analyzer &amp; Auto-Fix Engine &nbsp;&bull;&nbsp;
   Developed by <strong style="color:var(--t2)">Devendra Pillay</strong> &copy; 2026
-  &nbsp;&nbsp;&bull;&nbsp;&nbsp;
-  <a href="privacy.html" style="color:var(--t2); text-decoration:none;">
-    Privacy Policy
-  </a>
-  &nbsp;|&nbsp;
-  <a href="terms.html" style="color:var(--t2); text-decoration:none;">
-    Terms &amp; Conditions
-  </a> 
 </div>
 
 <script>
@@ -2651,12 +2644,24 @@ async function runAnalysis() {
       try { errData = JSON.parse(errText); } catch(e) {}
       var errMsg = errData.error || errText || ('HTTP ' + resp.status);
       console.error('[CDA] Lambda error ' + resp.status + ':', errMsg);
-      lg('❌ Server error ' + resp.status + ': ' + errMsg.slice(0,100), 'err');
 
-      if (resp.status === 401) throw new Error('Auth error: ' + errMsg);
-      if (resp.status === 429) throw new Error('Rate limited — wait 30 seconds and retry.');
-      if (resp.status === 504) throw new Error('Timeout — try a shorter backtrace or smaller source file.');
-      throw new Error('Lambda error ' + resp.status + ': ' + errMsg);
+      if (resp.status === 401) throw new Error('Session expired — please sign out and sign in again.');
+      if (resp.status === 429) throw new Error('Too many requests — please wait 30 seconds and retry.');
+      if (resp.status === 503 || resp.status === 504 || errMsg.includes('fetch') || errMsg.includes('supabase')) {
+        // Retry once on server/supabase errors
+        lg('⚠️ Server hiccup — retrying once...', 'info');
+        await new Promise(function(r){ setTimeout(r, 2000); });
+        resp = await fetch(LAMBDA, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey, 'X-Team-Token': 'CDA-AUTH' },
+          body: JSON.stringify({ backtrace: bt, source: src, filename: curFname,
+            additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
+            strict_json: isComplex, attempt: 1 }),
+        });
+        if (!resp.ok) throw new Error('Server temporarily unavailable. Please try again in a moment.');
+      } else {
+        throw new Error('Analysis error — please try again.');
+      }
     }
 
     var respData;
@@ -2848,7 +2853,8 @@ async function sendFollowup() {
 
     var data = await resp.json();
     var assistantMsg = data.result;
-    chatHistory.push({ role:'assistant', content: assistantMsg });
+    var isDeflection = assistantMsg && assistantMsg.includes('I can only help with questions related to this crash');
+    chatHistory.push({ role:'assistant', content: assistantMsg, offTopic: isDeflection });
 
     if (typing) typing.classList.remove('show');
     addChatBubble('assistant', assistantMsg);
@@ -3431,6 +3437,8 @@ function renderRCA() {
     chatSection = '<h2 style="color:#1e3a5f;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-top:24px">Fix Iteration History</h2>';
     var msgNum = 0;
     chatHistory.forEach(function(msg) {
+      // Skip off-topic deflections from RCA
+      if (msg.offTopic) return;
       if (msg.role === 'user') {
         msgNum++;
         chatSection += '<div style="margin:12px 0;padding:10px 14px;background:#f0f9ff;border-left:3px solid #3b82f6;border-radius:4px">';
@@ -3652,5 +3660,6 @@ async function sendFeedback(worked) {
 
 /* gate handled in <head> */
 </script>
+
 </body>
 </html>
