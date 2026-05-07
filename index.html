@@ -2634,8 +2634,12 @@ async function runAnalysis() {
     var isComplex = bt.length > 3000 || src.length > 6000;
     if (isComplex) lg('📊 Complex crash detected — using enhanced analysis...', 'info');
 
-    // Truncate large backtraces to keep Anthropic response fast
-    var btSend = bt.length > 4000 ? bt.slice(0, 4000) + '\n...[truncated for analysis]' : bt;
+    // Strip GDB pagination artifacts and truncate
+    var btSend = bt
+      .replace(/--Type <RET> for more.*$/gm, '')
+      .replace(/\(gdb\)\s*$/gm, '')
+      .trim();
+    if (btSend.length > 2500) btSend = btSend.slice(0, 2500) + '\n...[truncated]';
 
     // [log removed]
 
@@ -2653,7 +2657,7 @@ async function runAnalysis() {
       },
       body: JSON.stringify({
         backtrace:       btSend,
-        source:          src,
+        source:          src.length > 3000 ? src.slice(0, 3000) + '\n...[truncated]' : src,
         filename:        curFname,
         additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
         strict_json:     isComplex,
