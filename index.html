@@ -3044,19 +3044,33 @@ async function runAdvisor() {
     }
 
     var data   = await resp.json();
-    var raw    = data.result;
-    var parsed;
+    var raw    = data.result || '';
+    var files  = [];
+
+    // Advisor returns plain text — parse lines into file list
     try {
-      parsed = extractJSON(raw);
-    } catch(parseErr) {
-      throw new Error('Could not parse file list: ' + parseErr.message);
+      // Try JSON first (in case response is structured)
+      var parsed = extractJSON(raw);
+      files = parsed.files || [];
+    } catch(e) {
+      // Plain text fallback — extract filenames from each line
+      files = raw.split('\n')
+        .map(function(line) { return line.trim(); })
+        .filter(function(line) { return line.length > 0; })
+        .map(function(line) {
+          // Extract filename — handle formats like "- file.cpp: reason" or "file.cpp"
+          var match = line.match(/([a-zA-Z0-9_\-./]+\.[a-zA-Z]+)/);
+          var reason = line.replace(/^[-*\d.)\s]+/, '').replace(/^[^:]+:\s*/, '').trim();
+          return match ? { name: match[1], reason: reason || 'Required for analysis' } : null;
+        })
+        .filter(Boolean);
     }
 
     if (typing)  typing.classList.remove('show');
-    if (status)  status.textContent = '— ' + (parsed.files||[]).length + ' files identified';
+    if (status)  status.textContent = '— ' + files.length + ' files identified';
     if (rerunBtn) rerunBtn.style.display = 'inline-block';
 
-    renderAdvisorList(parsed.files || []);
+    renderAdvisorList(files);
 
     if (note && parsed.summary) {
       note.textContent = '💡 ' + parsed.summary;
