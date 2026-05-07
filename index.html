@@ -2656,17 +2656,7 @@ async function runAnalysis() {
       if (resp.status === 401) throw new Error('Session expired — please sign out and sign in again.');
       if (resp.status === 429) throw new Error('Too many requests — please wait 30 seconds and retry.');
       if (resp.status === 503 || resp.status === 504 || errMsg.includes('fetch') || errMsg.includes('supabase')) {
-        // Retry once on server/supabase errors
-        lg('⚠️ Server hiccup — retrying once...', 'info');
-        await new Promise(function(r){ setTimeout(r, 2000); });
-        resp = await fetch(LAMBDA, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey, 'X-Team-Token': 'CDA-AUTH' },
-          body: JSON.stringify({ backtrace: bt, source: src, filename: curFname,
-            additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
-            strict_json: isComplex, attempt: 1 }),
-        });
-        if (!resp.ok) throw new Error('Server temporarily unavailable. Please try again in a moment.');
+        throw new Error('Analysis timed out. Please set API Gateway timeout to 29000ms in AWS Console, or try with a shorter backtrace.');
       } else {
         throw new Error('Analysis error — please try again.');
       }
