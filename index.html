@@ -3051,7 +3051,7 @@ async function runAdvisor() {
     try {
       // Try JSON first (in case response is structured)
       var parsed = extractJSON(raw);
-      files = parsed.files || [];
+      files = Array.isArray(parsed) ? parsed : (parsed.files || []);
     } catch(e) {
       // Plain text fallback — extract filenames from each line
       files = raw.split('\n')
@@ -3061,7 +3061,7 @@ async function runAdvisor() {
           // Extract filename — handle formats like "- file.cpp: reason" or "file.cpp"
           var match = line.match(/([a-zA-Z0-9_\-./]+\.[a-zA-Z]+)/);
           var reason = line.replace(/^[-*\d.)\s]+/, '').replace(/^[^:]+:\s*/, '').trim();
-          return match ? { name: match[1], reason: reason || 'Required for analysis' } : null;
+          return match ? { filename: match[1], why: reason || 'Required for analysis', criticality: 'important' } : null;
         })
         .filter(Boolean);
     }
