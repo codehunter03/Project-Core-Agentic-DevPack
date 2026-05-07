@@ -1903,6 +1903,7 @@ void causeCrash() {
         <button class="tab" onclick="tab('diff',this)">📋 Diff</button>
         <button class="tab" onclick="tab('fixed',this)">✅ Fixed File</button>
         <button class="tab" onclick="tab('tips',this)">💡 Suggestions</button>
+        <button class="tab" onclick="tab('correlations',this);loadCorrelations()" id="corr-tab">🔗 Correlations</button>
         <button class="tab" onclick="tab('rca',this);renderRCA()" style="color:#da3633;font-weight:700">📄 RCA Doc</button>
       </div>
 
@@ -1958,6 +1959,15 @@ void causeCrash() {
           <button class="dl-btn" onclick="dlFixed()">⬇ Download Fixed File</button>
         </div>
         <div class="code-box" id="r-fixed"></div>
+      </div>
+
+      <!-- Correlations pane -->
+      <div class="tpane" id="tp-correlations" style="display:none">
+        <div id="corr-panel" style="padding:.5rem 0">
+          <div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">
+            Run an analysis first to see correlations
+          </div>
+        </div>
       </div>
 
       <!-- RCA Document pane -->
@@ -3444,6 +3454,69 @@ var rcaRendered = false;
 
 function escRCA(s) {
   return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// ── Crash Correlation Engine ─────────────────────────────────────────────
+async function loadCorrelations() {
+  var panel = document.getElementById('corr-panel');
+  if (!panel) return;
+  if (!curResult || !curResult.bug_category) {
+    panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">Run an analysis first to see correlations.</div>';
+    return;
+  }
+  panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">⏳ Searching historical crash database...</div>';
+
+  try {
+    var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/correlate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Team-Token': 'CDA-AUTH' },
+      body: JSON.stringify({
+        bug_category: curResult.bug_category,
+        signal:       curResult.signal || '',
+        root_cause:   curResult.root_cause || '',
+      })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var d = await resp.json();
+
+    var confColor = d.confidence === 'High' ? '#56d364' : d.confidence === 'Medium' ? '#e3b341' : '#8b949e';
+    var html = '<div style="padding:.25rem 0">';
+
+    // Header summary
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem;align-items:center">';
+    html += '<span style="font-size:.8rem;color:var(--t2)">Crash Family: <strong style="color:#d2a8ff">' + (d.crash_family||'—') + '</strong></span>';
+    html += '<span style="font-size:.8rem;color:var(--t2)">Seen: <strong style="color:var(--t1)">' + (d.total_seen||0) + 'x</strong></span>';
+    html += '<span style="font-size:.8rem;color:var(--t2)">Verified Fixes: <strong style="color:#56d364">' + (d.verified_fixes||0) + '</strong></span>';
+    html += '<span class="pill" style="color:'+confColor+';border-color:'+confColor+';font-size:.72rem">';
+    html += (d.confidence==='High'?'⬤⬤⬤':d.confidence==='Medium'?'⬤⬤◯':'⬤◯◯') + ' ' + (d.confidence||'Low') + ' Confidence</span>';
+    html += '</div>';
+
+    if (!d.similar || d.similar.length === 0) {
+      html += '<div style="color:var(--t3);font-size:.82rem;padding:1.5rem;text-align:center;border:1px dashed var(--s4);border-radius:8px">';
+      html += '🔍 No similar historical crashes found yet.<br><span style="font-size:.75rem">As more crashes are analyzed, patterns will emerge here.</span></div>';
+    } else {
+      d.similar.forEach(function(item, i) {
+        var pct    = Math.round((item.similarity_score || 0) * 100);
+        var worked = item.fix_worked === true;
+        var date   = item.created_at ? new Date(item.created_at).toLocaleDateString() : '—';
+        html += '<div style="margin-bottom:.75rem;padding:.75rem 1rem;background:var(--s2);border-radius:8px;border-left:3px solid ' + (worked?'#56d364':'#e3b341') + '">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">';
+        html += '<span style="font-size:.75rem;font-weight:700;color:var(--t1)">' + (item.signal||item.bug_category||'Unknown') + '</span>';
+        html += '<div style="display:flex;gap:8px;align-items:center">';
+        html += '<span style="font-size:.7rem;color:var(--t3)">' + date + '</span>';
+        html += '<span style="font-size:.7rem;font-weight:700;color:' + (pct>=80?'#56d364':pct>=60?'#e3b341':'#8b949e') + '">' + pct + '% match</span>';
+        html += worked ? '<span style="font-size:.68rem;color:#56d364">✓ Fix verified</span>' : '';
+        html += '</div></div>';
+        if (item.root_cause) html += '<div style="font-size:.78rem;color:var(--t2);margin-bottom:.3rem">' + item.root_cause + '</div>';
+        if (item.fix_explanation && worked) html += '<div style="font-size:.74rem;color:#56d364;margin-top:.3rem">Fix: ' + item.fix_explanation + '</div>';
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+    panel.innerHTML = html;
+  } catch(e) {
+    panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;padding:1rem">Could not load correlations: ' + e.message + '</div>';
+  }
 }
 
 function renderRCA() {
