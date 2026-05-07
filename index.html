@@ -3479,6 +3479,7 @@ async function loadCorrelations() {
         bug_category: bugCat,
         signal:       curResult.signal || '',
         root_cause:   curResult.root_cause || '',
+        exclude_id:   curAnalysisId || null,
       })
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -3494,7 +3495,14 @@ async function loadCorrelations() {
     html += '<span style="font-size:.8rem;color:var(--t2)">Verified Fixes: <strong style="color:#56d364">' + (d.verified_fixes||0) + '</strong></span>';
     html += '<span class="pill" style="color:'+confColor+';border-color:'+confColor+';font-size:.72rem">';
     html += (d.confidence==='High'?'⬤⬤⬤':d.confidence==='Medium'?'⬤⬤◯':'⬤◯◯') + ' ' + (d.confidence||'Low') + ' Confidence</span>';
+    if (d.disputed_fixes > 0) {
+      html += '<span class="pill" style="color:#f85149;border-color:#f85149;font-size:.72rem">⚠ ' + d.disputed_fixes + ' disputed</span>';
+    }
     html += '</div>';
+    if (d.warning) {
+      html += '<div style="padding:.6rem .8rem;margin-bottom:.75rem;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);border-radius:6px;font-size:.76rem;color:#f85149">';
+      html += '⚠️ ' + d.warning + '</div>';
+    }
 
     if (!d.similar || d.similar.length === 0) {
       html += '<div style="color:var(--t3);font-size:.82rem;padding:1.5rem;text-align:center;border:1px dashed var(--s4);border-radius:8px">';
