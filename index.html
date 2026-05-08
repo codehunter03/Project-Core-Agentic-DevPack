@@ -939,9 +939,16 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 (function() {
   try {
     // If returning from Google OAuth — hash has access_token
-    // Don't show login — let Supabase SDK process the hash
+    // Show checking spinner and let Supabase SDK process the hash
     var hash = window.location.hash || '';
-    if (hash.includes('access_token') || hash.includes('error_description')) return;
+    if (hash.includes('access_token') || hash.includes('error_description')) {
+      // Keep gate in checking state (spinner) — onAuthStateChange will hide it
+      document.addEventListener('DOMContentLoaded', function() {
+        var g = document.getElementById('gate');
+        if (g) g.className = 'checking'; // spinner only, no login form
+      });
+      return;
+    }
 
     // Check stored session validity
     var raw = localStorage.getItem('cda-sb-session');
