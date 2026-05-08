@@ -1218,7 +1218,7 @@ async function loadUserPlan(userId) {
 // ══════════════════════════════════════════════════════════════
 //  SESSION TIMEOUT — 30 minutes inactivity
 // ══════════════════════════════════════════════════════════════
-var TIMEOUT_MS      = 30 * 60 * 1000; // 30 minutes
+var TIMEOUT_MS      = 24 * 60 * 60 * 1000; // 24 hours (effectively disabled)
 var LAST_ACTIVE_KEY = 'cda-last-active';
 var timeoutTimer    = null;
 
@@ -1264,18 +1264,15 @@ function startActivityTracking() {
 
 function resetTimeoutTimer() {
   if (timeoutTimer) clearTimeout(timeoutTimer);
-  var delay = (typeof TIMEOUT_MS === 'number' && TIMEOUT_MS > 60000) ? TIMEOUT_MS : 30 * 60 * 1000;
-  console.log('[CDA] Timer reset — fires in', Math.round(delay/60000), 'minutes');
+  var delay = (typeof TIMEOUT_MS === 'number' && TIMEOUT_MS > 60000) ? TIMEOUT_MS : 24 * 60 * 60 * 1000;
   timeoutTimer = setTimeout(function() {
-    if (!currentUser) { console.log('[CDA] Timer fired but no user — skipping'); return; }
-    console.log('[CDA] 30min timeout reached — signing out');
+    if (!currentUser) return;
     showTimeoutToast();
     setTimeout(function() { if (currentUser) signOut(); }, 3000);
   }, delay);
 }
 
 function showTimeoutToast() {
-  console.log('[CDA] showTimeoutToast called', new Error().stack);
   var existing = document.getElementById('timeout-toast');
   if (existing) return;
   var toast = document.createElement('div');
