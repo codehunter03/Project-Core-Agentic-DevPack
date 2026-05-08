@@ -994,10 +994,10 @@ async function initSupabase() {
     auth: {
       autoRefreshToken:   true,
       persistSession:     true,
-      detectSessionInUrl: true,  // Handles OAuth redirect hash
+      detectSessionInUrl: true,
       storageKey:         SESSION_KEY,
       storage:            window.localStorage,
-      flowType:           'implicit',  // Ensure hash-based OAuth works
+      flowType:           'pkce',
     }
   });
 
@@ -1093,7 +1093,7 @@ async function signInWithGoogle() {
   const { error } = await supa.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: 'https://coredumpanalyzer.com/',
+      redirectTo: 'https://coredumpanalyzer.com',
       queryParams: {
         prompt: 'select_account',  // Always show account picker
         access_type: 'offline',
