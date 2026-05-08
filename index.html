@@ -1956,6 +1956,7 @@ void causeCrash() {
         <button class="tab" onclick="tab('fixed',this)">✅ Fixed File</button>
         <button class="tab" onclick="tab('tips',this)">💡 Suggestions</button>
         <button class="tab" onclick="tab('correlations',this);loadCorrelations()" id="corr-tab">🔗 Correlations</button>
+        <button class="tab" onclick="tab('validation',this);runFixValidation()" id="validation-tab">🛡 Validation</button>
         <button class="tab" onclick="tab('rca',this);renderRCA()" style="color:#da3633;font-weight:700">📄 RCA Doc</button>
       </div>
 
@@ -2020,6 +2021,15 @@ void causeCrash() {
           <button class="dl-btn" onclick="dlFixed()">⬇ Download Fixed File</button>
         </div>
         <div class="code-box" id="r-fixed"></div>
+      </div>
+
+      <!-- Fix Validation pane -->
+      <div class="tpane" id="tp-validation">
+        <div id="validation-panel" style="padding:.5rem 0">
+          <div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">
+            Run an analysis first to validate the fix
+          </div>
+        </div>
       </div>
 
       <!-- Correlations pane -->
@@ -3536,6 +3546,97 @@ var rcaRendered = false;
 
 function escRCA(s) {
   return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: FIX VALIDATION AGENT — Feature 3
+// Validates generated fix for regressions, races, ownership
+// ════════════════════════════════════════════════════════════
+async function runFixValidation() {
+  var panel = document.getElementById('validation-panel');
+  if (!panel) return;
+
+  if (!curResult) {
+    panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">Run an analysis first.</div>';
+    return;
+  }
+
+  // Build validation context from current result
+  var fixCode     = curResult.fixed_line_code || curResult.fixed_code || '';
+  var buggyCode   = curResult.buggy_line_code || '';
+  var rootCause   = curResult.root_cause || '';
+  var fixExp      = curResult.fix_explanation || '';
+  var bugCategory = curResult.bug_category || '';
+
+  if (!fixCode && !fixExp) {
+    panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">No fix generated to validate.</div>';
+    return;
+  }
+
+  panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;text-align:center;padding:2rem">⏳ Validating fix for regressions and safety issues...</div>';
+
+  try {
+    var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/validate-fix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Team-Token': 'CDA-AUTH' },
+      body: JSON.stringify({
+        root_cause:     rootCause,
+        bug_category:   bugCategory,
+        buggy_code:     buggyCode,
+        fixed_code:     fixCode,
+        fix_explanation: fixExp,
+        backtrace:      document.getElementById('bt') ? document.getElementById('bt').value.slice(0,1000) : '',
+      })
+    });
+
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var d = await resp.json();
+
+    // Render verdict
+    var verdictColor = d.verdict === 'SAFE'    ? '#56d364'
+                     : d.verdict === 'CAUTION' ? '#e3b341'
+                     : '#f85149';
+    var verdictIcon  = d.verdict === 'SAFE'    ? '✅'
+                     : d.verdict === 'CAUTION' ? '⚠️'
+                     : '❌';
+
+    var html = '<div style="padding:.25rem 0">';
+
+    // Verdict banner
+    html += '<div style="padding:.9rem 1.1rem;background:var(--s2);border-radius:8px;border:2px solid ' + verdictColor + ';margin-bottom:.75rem;display:flex;align-items:center;justify-content:space-between">';
+    html += '<div>';
+    html += '<div style="font-size:.7rem;color:var(--t3);margin-bottom:.2rem;letter-spacing:.5px">VALIDATION VERDICT</div>';
+    html += '<div style="font-size:1.1rem;font-weight:800;color:' + verdictColor + '">' + verdictIcon + ' ' + (d.verdict || 'UNKNOWN') + '</div>';
+    html += '</div>';
+    html += '<div style="text-align:right">';
+    html += '<div style="font-size:.7rem;color:var(--t3);margin-bottom:.2rem">REGRESSION RISK</div>';
+    html += '<div style="font-size:.9rem;font-weight:700;color:' + verdictColor + '">' + (d.regression_likelihood || '—') + '</div>';
+    html += '</div></div>';
+
+    // Sections helper
+    function section(icon, title, content, color) {
+      if (!content) return '';
+      return '<div style="margin-bottom:.6rem;padding:.65rem .9rem;background:var(--s1);border-radius:8px;border-left:3px solid ' + color + '">' +
+        '<div style="font-size:.7rem;font-weight:700;color:' + color + ';margin-bottom:.3rem;letter-spacing:.5px">' + icon + ' ' + title + '</div>' +
+        '<div style="font-size:.78rem;color:var(--t2);line-height:1.6">' + content + '</div>' +
+        '</div>';
+    }
+
+    html += section('🔍', 'ANALYSIS', d.analysis, '#58a6ff');
+    html += section('⚠️', 'POTENTIAL RISKS', d.risks, '#e3b341');
+    html += section('🚫', 'UNSAFE MODIFICATIONS', d.unsafe_modifications, '#f85149');
+    html += section('💡', 'SUGGESTED IMPROVEMENTS', d.improvements, '#56d364');
+
+    html += '<div style="font-size:.72rem;color:var(--t3);margin-top:.4rem;text-align:right">';
+    html += '🛡 Fix Validation Agent — senior engineer review simulation';
+    html += '</div>';
+    html += '</div>';
+
+    panel.innerHTML = html;
+
+  } catch(e) {
+    panel.innerHTML = '<div style="color:var(--t3);font-size:.8rem;padding:1rem">Validation failed: ' + e.message + '</div>';
+  }
 }
 
 // ── Crash Correlation Engine ─────────────────────────────────────────────
