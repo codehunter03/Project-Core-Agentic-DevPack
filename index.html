@@ -975,6 +975,10 @@ const SESSION_KEY = 'cda-sb-session';
 
 var supa = null;
 
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: AUTH — Supabase init, session management, OAuth
+// ════════════════════════════════════════════════════════════
 async function initSupabase() {
   if (typeof supabase === 'undefined') { setTimeout(initSupabase, 50); return; }
 
@@ -1006,15 +1010,17 @@ async function initSupabase() {
       event === 'TOKEN_REFRESHED' ||
       event === 'INITIAL_SESSION'
     )) {
-      // Check 30-min timeout first
+      // Check 30-min timeout — only if user was previously active
       var lastActive = parseInt(localStorage.getItem(LAST_ACTIVE_KEY) || '0');
-      var elapsed    = lastActive ? Date.now() - lastActive : 0;
-      if (lastActive && elapsed >= TIMEOUT_MS) {
-        try { await supa.auth.signOut({ scope: 'local' }); } catch(e) {}
-        localStorage.removeItem(LAST_ACTIVE_KEY);
-        var g = document.getElementById('gate');
-        if (g) { g.className = ''; g.style.display = ''; }
-        return;
+      if (lastActive > 0) {
+        var elapsed = Date.now() - lastActive;
+        if (elapsed >= TIMEOUT_MS) {
+          try { await supa.auth.signOut({ scope: 'local' }); } catch(e) {}
+          localStorage.removeItem(LAST_ACTIVE_KEY);
+          var g = document.getElementById('gate');
+          if (g) { g.className = ''; g.style.display = ''; }
+          return;
+        }
       }
 
       var g = document.getElementById('gate');
@@ -1070,7 +1076,11 @@ function setAuthMsg(msg, type) {
 }
 
 // ── Google Sign In ────────────────────────────────────────────
-async function signInWithGoogle() {
+async 
+// ════════════════════════════════════════════════════════════
+// FEATURE: AUTH — Google OAuth sign in
+// ════════════════════════════════════════════════════════════
+function signInWithGoogle() {
   if (!supa) { setAuthMsg('Still loading — please wait a moment', 'err'); return; }
   setAuthMsg('Redirecting to Google...', '');
   const { error } = await supa.auth.signInWithOAuth({
@@ -1165,6 +1175,10 @@ async function onAuthSuccess(user) {
 }
 
 // ── Load user plan — direct Supabase (user can read own row) ──
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: BILLING — Load user plan via Lambda /userplan
+// ════════════════════════════════════════════════════════════
 async function loadUserPlan(userId) {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/userplan', {
@@ -1268,6 +1282,10 @@ function showTimeoutToast() {
   document.body.appendChild(toast);
 }
 
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: AUTH — Welcome toast, session timeout, activity tracking
+// ════════════════════════════════════════════════════════════
 function showWelcomeToast(email) {
   // Don't show on very first login (no previous session key)
   var isReturn = !!localStorage.getItem('cda_visited');
@@ -1332,6 +1350,10 @@ function updateUserBadge(email) {
   }
 }
 
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: BILLING — Usage pill UI update
+// ════════════════════════════════════════════════════════════
 function updateUsagePill() {
   var pill    = document.getElementById('usage-pill');
   var upgrBtn = document.getElementById('upgrade-btn');
@@ -1365,6 +1387,10 @@ function checkAnalysisLimit() {
 }
 
 // ── Increment usage after analysis ───────────────────────────
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: BILLING — Increment usage counter via Lambda /increment
+// ════════════════════════════════════════════════════════════
 async function incrementUsage() {
   if (currentPlan === 'pro' || !currentUser) return;
 
@@ -1395,6 +1421,10 @@ async function incrementUsage() {
 }
 
 // ── Upgrade modal ─────────────────────────────────────────────
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: BILLING — Upgrade modal (free limit hit)
+// ════════════════════════════════════════════════════════════
 function showUpgradeModal(locked) {
   var modal    = document.getElementById('upgrade-modal');
   var skipBtn  = document.getElementById('upgrade-skip-btn');
@@ -1569,7 +1599,11 @@ function goToCheckout() {
 }
 
 // ── Sign out ──────────────────────────────────────────────────
-async function signOut() {
+async 
+// ════════════════════════════════════════════════════════════
+// FEATURE: AUTH — Sign out, session cleanup
+// ════════════════════════════════════════════════════════════
+function signOut() {
   // Clear timeout timer
   if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
   localStorage.removeItem(LAST_ACTIVE_KEY);
@@ -2488,6 +2522,10 @@ function renderFallbackCodeFix(container, lines, faultLine, type) {
 // ══════════════════════════════════════════════
 //  RENDER RESULT
 // ══════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: ANALYSIS — Render analysis result cards
+// ════════════════════════════════════════════════════════════
 function renderResult(r) {
   const sev=r.severity||'High', sc=SEV[sev]||SEV.High;
   const sb=document.getElementById('sumbar');
@@ -2544,6 +2582,10 @@ function renderResult(r) {
 // ══════════════════════════════════════════════
 //  MAIN ANALYSIS
 // ══════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: ANALYSIS — Main crash analysis, calls Lambda /analyze
+// ════════════════════════════════════════════════════════════
 async function runAnalysis() {
   // Always verify limit fresh from Supabase before running
   if (currentUser) {
@@ -3039,6 +3081,10 @@ function markAdvisorUploaded(fname) {
 
 
 
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: FILE ADVISOR — Auto-scan backtrace for required files
+// ════════════════════════════════════════════════════════════
 async function runAdvisor() {
   var apiKey    = 'server-managed';
   var bt        = document.getElementById('bt').value.trim();
@@ -3127,6 +3173,10 @@ async function runAdvisor() {
   }
 }
 
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: FILE ADVISOR — Render file list UI
+// ════════════════════════════════════════════════════════════
 function renderAdvisorList(files) {
   var list = document.getElementById('advisor-list');
   list.innerHTML = '';
@@ -3471,6 +3521,10 @@ function escRCA(s) {
 }
 
 // ── Crash Correlation Engine ─────────────────────────────────────────────
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: CORRELATION ENGINE — Historical pattern matching (Feature 1)
+// ════════════════════════════════════════════════════════════
 async function loadCorrelations() {
   var panel = document.getElementById('corr-panel');
   if (!panel) return;
@@ -3548,6 +3602,10 @@ async function loadCorrelations() {
 }
 
 // ── Evidence-Based Root Cause Agent ──────────────────────────────────────
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: EVIDENCE AGENT — Ranked hypothesis rendering (Feature 2)
+// ════════════════════════════════════════════════════════════
 function renderEvidenceAgent(r) {
   var section = document.getElementById('evidence-agent-section');
   var panel   = document.getElementById('evidence-agent-panel');
@@ -3653,6 +3711,10 @@ function renderEvidenceAgent(r) {
   panel.innerHTML = html;
 }
 
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: RCA EXPORT — PDF/JIRA doc generation
+// ════════════════════════════════════════════════════════════
 function renderRCA() {
   if (!curResult) return;
 
