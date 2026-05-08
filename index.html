@@ -1238,7 +1238,16 @@ function checkSessionTimeout() {
   }
 }
 
+var activityTrackingStarted = false;
+
 function startActivityTracking() {
+  if (activityTrackingStarted) {
+    // Already tracking — just reset the timer
+    resetTimeoutTimer();
+    return;
+  }
+  activityTrackingStarted = true;
+
   // Update last active on any user interaction
   var events = ['mousedown','keydown','touchstart','scroll','click'];
   events.forEach(function(ev) {
@@ -1255,10 +1264,12 @@ function startActivityTracking() {
 
 function resetTimeoutTimer() {
   if (timeoutTimer) clearTimeout(timeoutTimer);
+  var delay = (typeof TIMEOUT_MS === 'number' && TIMEOUT_MS > 60000) ? TIMEOUT_MS : 30 * 60 * 1000;
   timeoutTimer = setTimeout(function() {
+    if (!currentUser) return; // don't fire if not logged in
     showTimeoutToast();
     setTimeout(function() { if (currentUser) signOut(); }, 3000);
-  }, TIMEOUT_MS);
+  }, delay);
 }
 
 function showTimeoutToast() {
