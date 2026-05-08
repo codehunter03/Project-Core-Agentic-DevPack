@@ -1080,7 +1080,7 @@ async
 // ════════════════════════════════════════════════════════════
 // FEATURE: AUTH — Google OAuth sign in
 // ════════════════════════════════════════════════════════════
-function signInWithGoogle() {
+async function signInWithGoogle() {
   if (!supa) { setAuthMsg('Still loading — please wait a moment', 'err'); return; }
   setAuthMsg('Redirecting to Google...', '');
   const { error } = await supa.auth.signInWithOAuth({
