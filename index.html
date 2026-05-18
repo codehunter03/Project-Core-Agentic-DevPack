@@ -1225,7 +1225,7 @@ async function loadUserPlan(userId) {
 // ══════════════════════════════════════════════════════════════
 //  SESSION TIMEOUT — 30 minutes inactivity
 // ══════════════════════════════════════════════════════════════
-var TIMEOUT_MS      = 24 * 60 * 60 * 1000; // 24 hours (effectively disabled)
+var TIMEOUT_MS      = 30 * 60 * 1000; // 30 minutes
 var LAST_ACTIVE_KEY = 'cda-last-active';
 var timeoutTimer    = null;
 
@@ -1271,7 +1271,7 @@ function startActivityTracking() {
 
 function resetTimeoutTimer() {
   if (timeoutTimer) clearTimeout(timeoutTimer);
-  var delay = (typeof TIMEOUT_MS === 'number' && TIMEOUT_MS > 60000) ? TIMEOUT_MS : 24 * 60 * 60 * 1000;
+  var delay = (typeof TIMEOUT_MS === 'number' && TIMEOUT_MS > 60000) ? TIMEOUT_MS : 30 * 60 * 1000;
   timeoutTimer = setTimeout(function() {
     if (!currentUser) return;
     showTimeoutToast();
@@ -2977,7 +2977,7 @@ async function sendFollowup() {
     var errDiv = document.createElement('div');
     errDiv.className = 'chat-bubble assistant';
     errDiv.style.borderColor = 'var(--red2)';
-    errDiv.innerHTML = '<div class="cb-label">Error</div>&#10060; ' + err.message;
+    errDiv.innerHTML = '<div class="cb-label">Error</div>&#10060; ' + esc(err.message);
     var h2 = document.getElementById('chat-history');
     if (h2) h2.appendChild(errDiv);
   } finally {
@@ -3194,7 +3194,7 @@ async function runAdvisor() {
     else if (errMsg.includes('402') || errMsg.includes('credit'))  errHint = ' — Service temporarily unavailable. Please try again.';
     else if (errMsg.includes('429')) errHint = ' — Rate limited, wait 30s and try again';
     else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) errHint = ' — Check internet connection';
-    list.innerHTML = '<div style="color:var(--red);font-size:.72rem;padding:.5rem">❌ File scan failed: ' + errMsg + errHint + '</div>';
+    list.innerHTML = '<div style="color:var(--red);font-size:.72rem;padding:.5rem">❌ File scan failed: ' + esc(errMsg) + esc(errHint) + '</div>';
     if (rerunBtn) rerunBtn.style.display = 'inline-block';
   } finally {
     // nothing to re-enable — no button to manage
