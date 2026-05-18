@@ -944,40 +944,33 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 </style>
 
 <script>
-// ── Pre-check: show login immediately if no session ──────────────────────
+// ── Pre-check: show landing by default, spinner only when session exists ─────
 (function() {
   try {
-    // If returning from Google OAuth — hash has access_token
-    // Show checking spinner and let Supabase SDK process the hash
     var hash = window.location.hash || '';
+    // Returning from OAuth — show spinner
     if (hash.includes('access_token') || hash.includes('error_description')) {
-      // Keep gate in checking state (spinner) — onAuthStateChange will hide it
       document.addEventListener('DOMContentLoaded', function() {
         var g = document.getElementById('gate');
-        if (g) g.className = 'checking'; // spinner only, no login form
+        if (g) g.className = 'checking';
       });
       return;
     }
-
-    // Check stored session validity
+    // Valid existing session — skip landing, go straight to tool
     var raw = localStorage.getItem('cda-sb-session');
-    var ok  = false;
+    var hasSession = false;
     if (raw) {
       var s = JSON.parse(raw);
-      ok = !!(s && s.access_token && s.expires_at > Math.floor(Date.now()/1000));
+      hasSession = !!(s && s.access_token && s.expires_at > Math.floor(Date.now()/1000));
     }
-    if (!ok) {
+    if (hasSession) {
       document.addEventListener('DOMContentLoaded', function() {
         var g = document.getElementById('gate');
-        if (g) g.className = '';
+        if (g) g.className = 'checking';
       });
     }
-  } catch(e) {
-    document.addEventListener('DOMContentLoaded', function() {
-      var g = document.getElementById('gate');
-      if (g) g.className = '';
-    });
-  }
+    // No session — gate stays '', landing page shows
+  } catch(e) {}
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
@@ -1676,7 +1669,7 @@ function toggleGateEye() {}
 <body>
 
 <!-- ══ PASSWORD GATE ══ -->
-<div id="gate" class="checking"><canvas id="gate-canvas"></canvas>
+<div id="gate" class=""><canvas id="gate-canvas"></canvas>
 
   <!-- ══ LANDING PAGE ══ -->
   <div id="gate-landing">
