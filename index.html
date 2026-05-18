@@ -941,6 +941,68 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
   background:var(--s2);border-top:1px solid var(--s4);
   padding:.65rem;font-size:.68rem;color:var(--t3);text-align:center;
 }
+
+/* ── Sign-in panel ── */
+#gate-signin-panel{position:absolute;inset:0;z-index:3;display:none;align-items:center;justify-content:center;padding:1.5rem;}
+#gate-signin-panel.show{display:flex;}
+#gate-landing.hide{display:none!important;}
+
+/* ── Landing page layout ── */
+#gate-landing{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:space-between;width:100%;height:100%;}
+#gate-landing.hide{display:none!important;}
+.landing-hero{flex:1;display:flex;align-items:center;padding:0 6%;width:100%;min-height:0;}
+.landing-left{flex:0 0 340px;z-index:3;}
+.landing-eyebrow{font-size:10px;letter-spacing:3px;color:#00d4ff;text-transform:uppercase;font-weight:700;margin-bottom:18px;}
+.landing-h1{font-size:clamp(32px,4.5vw,56px);font-weight:900;line-height:1.05;color:#fff;margin-bottom:18px;font-family:'Syne',sans-serif;}
+.landing-h1 span{background:linear-gradient(135deg,#00d4ff,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.landing-sub{font-size:14px;color:#8892a4;line-height:1.65;margin-bottom:28px;max-width:340px;}
+.landing-btns{display:flex;flex-direction:column;gap:10px;margin-bottom:36px;}
+.btn-analyze{display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;border:none;padding:13px 28px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;width:fit-content;box-shadow:0 4px 24px rgba(0,212,255,.25);}
+.btn-analyze:hover{transform:translateY(-1px);box-shadow:0 6px 32px rgba(0,212,255,.4);}
+.btn-demo{display:inline-flex;align-items:center;gap:8px;background:transparent;color:#8892a4;border:1px solid rgba(255,255,255,.12);padding:13px 28px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;width:fit-content;}
+.btn-demo:hover{border-color:rgba(0,212,255,.3);color:#e2e8f0;}
+.landing-stats{display:flex;gap:28px;}
+.lstat{display:flex;flex-direction:column;}
+.lstat-num{font-size:24px;font-weight:900;color:#fff;line-height:1;}
+.lstat-lbl{font-size:9px;color:#4a5568;letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;}
+.landing-viz{flex:1;position:relative;min-height:400px;}
+/* Orbital */
+.orb-wrap{position:absolute;top:50%;left:55%;transform:translate(-50%,-50%);width:280px;height:280px;}
+.orb{position:absolute;top:50%;left:50%;border-radius:50%;border:1px solid rgba(0,212,255,.15);}
+.orb1{width:280px;height:280px;margin:-140px 0 0 -140px;animation:orb-cw 22s linear infinite;}
+.orb2{width:210px;height:210px;margin:-105px 0 0 -105px;animation:orb-ccw 15s linear infinite;border-color:rgba(124,58,237,.2);}
+.orb3{width:140px;height:140px;margin:-70px 0 0 -70px;animation:orb-cw 9s linear infinite;border-color:rgba(0,212,255,.3);}
+@keyframes orb-cw{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes orb-ccw{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
+.orb-core{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);}
+/* Panels */
+.lp{position:absolute;background:rgba(2,8,18,.82);border:1px solid rgba(0,212,255,.18);border-radius:8px;padding:10px 14px;backdrop-filter:blur(12px);}
+.lp-label{font-size:9px;color:#00d4ff;text-transform:uppercase;letter-spacing:2px;font-weight:700;display:flex;align-items:center;gap:5px;}
+.lp-val{font-size:12px;color:#e2e8f0;margin-top:3px;font-family:'Courier New',monospace;}
+.lp-dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.dot-r{background:#ef4444;box-shadow:0 0 5px #ef4444;animation:dpulse 1.4s ease-in-out infinite;}
+.dot-b{background:#00d4ff;box-shadow:0 0 5px #00d4ff;animation:dpulse 1.8s ease-in-out infinite .3s;}
+.dot-g{background:#22c55e;box-shadow:0 0 5px #22c55e;animation:dpulse 2s ease-in-out infinite .6s;}
+.dot-a{background:#f59e0b;box-shadow:0 0 5px #f59e0b;animation:dpulse 1.6s ease-in-out infinite .9s;}
+@keyframes dpulse{0%,100%{opacity:1}50%{opacity:.25}}
+.lp1{top:8%;left:30%;animation:fpanel 3.2s ease-in-out infinite;}
+.lp2{top:15%;right:4%;animation:fpanel 2.8s ease-in-out infinite .4s;}
+.lp3{top:48%;right:2%;animation:fpanel 3.5s ease-in-out infinite .8s;}
+.lp4{bottom:22%;left:25%;animation:fpanel 3.1s ease-in-out infinite 1.2s;}
+.lp5{bottom:8%;right:6%;animation:fpanel 2.6s ease-in-out infinite .6s;}
+@keyframes fpanel{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+/* Ticker */
+.landing-ticker{width:100%;background:rgba(0,212,255,.05);border-top:1px solid rgba(0,212,255,.1);padding:10px 0;overflow:hidden;flex-shrink:0;}
+.ticker-track{display:flex;gap:48px;white-space:nowrap;animation:ticker 28s linear infinite;width:max-content;}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.ticker-item{font-size:11px;color:#4a5568;letter-spacing:.5px;display:flex;align-items:center;gap:6px;}
+.ticker-item span{color:#00d4ff;}
+/* Scroll caret */
+.scroll-caret{position:absolute;bottom:52px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:50%;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:caretbob .8s ease-in-out infinite alternate;color:#00d4ff;font-size:16px;z-index:4;}
+@keyframes caretbob{from{transform:translateX(-50%) translateY(0)}to{transform:translateX(-50%) translateY(6px)}}
+/* Sign-in panel */
+#gate-signin-panel{position:absolute;inset:0;z-index:3;display:none;align-items:center;justify-content:center;padding:1.5rem;}
+#gate-signin-panel.show{display:flex;}
 </style>
 
 <script>
@@ -4354,12 +4416,7 @@ async function sendFeedback(worked) {
 
 <script>
 // ── Landing page transitions ──────────────────────────────────────────────────
-function showSignIn() {
-  var landing = document.getElementById('gate-landing');
-  var panel   = document.getElementById('gate-signin-panel');
-  if (landing) landing.classList.add('hide');
-  if (panel)   panel.classList.add('show');
-}
+
 
 function showDemoVideo() {
   var modal = document.getElementById('demo-modal');
@@ -4536,4 +4593,3 @@ function hideDemoVideo() {
 </script>
 </body>
 </html>
-
