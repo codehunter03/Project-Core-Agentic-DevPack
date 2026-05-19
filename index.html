@@ -2761,6 +2761,21 @@ function renderResult(r) {
 // ══════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════════
+// ── Degraded / offline banner ─────────────────────────────────────────────────
+function showDegradedBanner(reason) {
+  var existing = document.getElementById('degraded-banner');
+  if (existing) return; // already showing
+  var msg = reason === 'timeout'
+    ? 'The analysis backend is taking longer than usual — this may indicate a cold start or high load. Your retry is in progress.'
+    : 'The analysis service appears to be unavailable right now (network error or backend down). Please check your connection and try again in a moment.';
+  var banner = document.createElement('div');
+  banner.id = 'degraded-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#7c3a0a;color:#fde68a;font-size:13px;font-weight:600;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;';
+  banner.innerHTML = '<span>⚠️ ' + msg + '</span><button onclick="document.getElementById(\'degraded-banner\').remove()" style="background:none;border:none;color:#fde68a;font-size:18px;cursor:pointer;line-height:1;">×</button>';
+  document.body.prepend(banner);
+  setTimeout(function() { if (banner.parentNode) banner.remove(); }, 15000);
+}
+
 // FEATURE: ANALYSIS — Main crash analysis, calls Lambda /analyze
 // ════════════════════════════════════════════════════════════
 async function runAnalysis() {
@@ -2799,7 +2814,9 @@ async function runAnalysis() {
     showErr('Please enter and save your Anthropic API key first (above).'); return;
   }
   if(!bt){showErr('Please paste a GDB backtrace or core dump output.');return;}
+  if(!/^#\d+/m.test(bt)){showErr('Invalid backtrace — must contain at least one stack frame (e.g. #0  main () at crash.c:10). Please paste valid GDB output.');return;}
   if(!src){showErr('Please paste or upload the source file.');return;}
+  if(!navigator.onLine){showErr('You appear to be offline. Please check your internet connection and try again.');return;}
 
   // Warn if source file is very large
   var srcLines = src.split('\n').length;
@@ -2871,28 +2888,50 @@ async function runAnalysis() {
 
     // [log removed]
 
-    // Fetch with 28s timeout (just under API Gateway 29s limit)
-    var controller = new AbortController();
-    var timeoutId  = setTimeout(function() { controller.abort(); }, 28000);
+    // ── Fetch with retry + exponential backoff ───────────────────────────
+    var MAX_ATTEMPTS = 2;
+    var TIMEOUTS     = [28000, 35000]; // 28s first try, 35s on retry
+    var resp         = null;
 
-    var resp = await fetch(LAMBDA, {
-      method:  'POST',
-      signal:  controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key':    apiKey,
-        'X-Team-Token': 'CDA-AUTH',
-      },
-      body: JSON.stringify({
-        backtrace:       btSend,
-        source:          src.length > 3000 ? src.slice(0, 3000) + '\n...[truncated]' : src,
-        filename:        curFname,
-        additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
-        strict_json:     isComplex,
-        attempt:         1,
-      }),
-    });
-    clearTimeout(timeoutId);
+    for (var attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        var backoff = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, ...
+        lg('⏳ Still analyzing — retrying in ' + (backoff/1000) + 's (attempt ' + (attempt+1) + '/' + MAX_ATTEMPTS + ')...', 'info');
+        await sleep(backoff);
+      }
+
+      var controller = new AbortController();
+      var timeoutId  = setTimeout(function() { controller.abort(); }, TIMEOUTS[attempt]);
+
+      try {
+        resp = await fetch(LAMBDA, {
+          method:  'POST',
+          signal:  controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key':    apiKey,
+            'X-Team-Token': 'CDA-AUTH',
+            'X-User-Id':    currentUser ? currentUser.id : 'anon',
+          },
+          body: JSON.stringify({
+            backtrace:       btSend,
+            source:          src.length > 3000 ? src.slice(0, 3000) + '\n...[truncated]' : src,
+            filename:        curFname,
+            additionalFiles: Object.keys(uploadedFiles).length > 1 ? uploadedFiles : {},
+            strict_json:     isComplex,
+            attempt:         attempt + 1,
+          }),
+        });
+        clearTimeout(timeoutId);
+        break; // success — exit retry loop
+      } catch(fetchErr) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError' && attempt < MAX_ATTEMPTS - 1) {
+          continue; // timeout on non-last attempt — retry
+        }
+        throw fetchErr; // last attempt or non-timeout error — propagate
+      }
+    }
 
     // Log actual HTTP status for debugging
     // [log removed]
@@ -2959,22 +2998,24 @@ async function runAnalysis() {
     }
 
   } catch(err) {
-    if (err.name === 'AbortError') {
-      showErr('Analysis timed out — try with a shorter backtrace or source file.');
-      lg('❌ Request timed out after 28s', 'err');
-      document.getElementById('empty').style.display='flex';
-    } else {
-    lg('❌ '+err.message,'err');
-    let hint='';
-    if(err.message.includes('401'))       hint=' — Analysis service error. Please try again.';
-    else if(err.message.includes('429'))  hint=' — Rate limited. Wait 30 seconds and try again.';
-    else if(err.message.includes('402'))  hint=' — Service temporarily unavailable. Please try again shortly.';
-    else if(err.message.includes('credit')||err.message.includes('balance')) hint=' — Service temporarily unavailable. Please try again shortly.';
-    else if(err.message.includes('Failed to fetch')) hint=' — Check your internet connection.';
-    else if(err.message.includes('overloaded')) hint=' — Anthropic API is busy. Wait 30 seconds and retry.';
-    showErr(err.message+hint);
+    var isDegraded = err.name === 'AbortError' ||
+                     err.message.includes('Failed to fetch') ||
+                     err.message.includes('503') ||
+                     err.message.includes('504') ||
+                     err.message.includes('overloaded') ||
+                     !navigator.onLine;
+    if (isDegraded) showDegradedBanner(err.name === 'AbortError' ? 'timeout' : 'down');
+
+    lg('❌ ' + err.message, 'err');
+    var hint = '';
+    if(err.name === 'AbortError')                                            hint = ' — Analysis timed out after two attempts. Try a shorter backtrace.';
+    else if(err.message.includes('401'))                                     hint = ' — Session error. Please sign out and sign in again.';
+    else if(err.message.includes('429'))                                     hint = ' — Rate limited. Wait 30 seconds and try again.';
+    else if(err.message.includes('402') || err.message.includes('credit') || err.message.includes('balance')) hint = ' — Service temporarily unavailable. Try again shortly.';
+    else if(err.message.includes('Failed to fetch') || !navigator.onLine)   hint = ' — Check your internet connection.';
+    else if(err.message.includes('overloaded'))                              hint = ' — Anthropic API is busy. Wait 30 seconds and retry.';
+    showErr(err.message + hint);
     document.getElementById('empty').style.display='flex';
-    }
   } finally {
     // Only re-enable run button if user still has analyses left
     if (currentPlan === 'pro' || analysesUsed < analysesLimit) {
