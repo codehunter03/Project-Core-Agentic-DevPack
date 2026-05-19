@@ -4166,224 +4166,14 @@ function downloadRCA(format) {
     win.document.write('<style>@media print{body{margin:0}}</style>');
     win.document.write('</head><body>');
     win.document.write(docContent.outerHTML);
-    win.document.write('
-<script>
-// ── Landing page transitions ──────────────────────────────────────────────────
-function showSignIn() {
-  var landing = document.getElementById('gate-landing');
-  var panel   = document.getElementById('gate-signin-panel');
-  if (landing) { landing.classList.add('hide'); landing.style.display='none'; }
-  if (panel)   { panel.style.display='flex'; panel.classList.add('show'); }
-}
-
-function showDemoVideo() {
-  var modal = document.getElementById('demo-modal');
-  if (modal) modal.style.display = 'flex';
-}
-
-function hideDemoVideo() {
-  var modal = document.getElementById('demo-modal');
-  if (modal) modal.style.display = 'none';
-}
-
-// ── Animated background canvas ────────────────────────────────────────────────
-(function(){
-  var canvas = document.getElementById('gate-canvas');
-  if(!canvas) return;
-  var ctx = canvas.getContext('2d');
-  var gate = document.getElementById('gate');
-  var nodes = [];
-  var mx = 0, my = 0;
-  var animRunning = true;
-
-  function resize(){
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    initNodes();
-  }
-
-  function initNodes(){
-    nodes = [];
-    var count = Math.min(Math.floor((canvas.width * canvas.height) / 12000), 90);
-    for(var i=0;i<count;i++){
-      nodes.push({
-        x: Math.random()*canvas.width,
-        y: Math.random()*canvas.height,
-        vx: (Math.random()-.5)*.35,
-        vy: (Math.random()-.5)*.35,
-        r:  Math.random()*1.5+.4,
-        pulse: Math.random()*Math.PI*2
-      });
-    }
-  }
-
-  document.addEventListener('mousemove', function(e){ mx=e.clientX; my=e.clientY; });
-
-  var scanY = 0;
-
-  function draw(){
-    if(!animRunning) return;
-    var w=canvas.width, h=canvas.height;
-    ctx.clearRect(0,0,w,h);
-    ctx.fillStyle='#020812'; ctx.fillRect(0,0,w,h);
-
-    // Grid
-    var gw=44;
-    ctx.strokeStyle='rgba(0,212,255,0.032)'; ctx.lineWidth=.5;
-    for(var x=0;x<w;x+=gw){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
-    for(var y=0;y<h;y+=gw){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
-
-    // Cyan glow left
-    var g1=ctx.createRadialGradient(w*.15,h*.5,0,w*.15,h*.5,w*.45);
-    g1.addColorStop(0,'rgba(0,212,255,0.07)'); g1.addColorStop(1,'transparent');
-    ctx.fillStyle=g1; ctx.fillRect(0,0,w,h);
-
-    // Violet glow right
-    var g2=ctx.createRadialGradient(w*.8,h*.35,0,w*.8,h*.35,w*.4);
-    g2.addColorStop(0,'rgba(124,58,237,0.08)'); g2.addColorStop(1,'transparent');
-    ctx.fillStyle=g2; ctx.fillRect(0,0,w,h);
-
-    // Mouse glow
-    if(mx>0){
-      var gm=ctx.createRadialGradient(mx,my,0,mx,my,160);
-      gm.addColorStop(0,'rgba(0,212,255,0.04)'); gm.addColorStop(1,'transparent');
-      ctx.fillStyle=gm; ctx.fillRect(0,0,w,h);
-    }
-
-    // Scan line
-    scanY=(scanY+.7)%h;
-    var sl=ctx.createLinearGradient(0,0,w,0);
-    sl.addColorStop(0,'transparent'); sl.addColorStop(.5,'rgba(0,212,255,0.1)'); sl.addColorStop(1,'transparent');
-    ctx.fillStyle=sl; ctx.fillRect(0,scanY,w,1.5);
-
-    // Nodes
-    nodes.forEach(function(n,i){
-      n.x+=n.vx; n.y+=n.vy; n.pulse+=.025;
-      if(n.x<0||n.x>w) n.vx*=-1;
-      if(n.y<0||n.y>h) n.vy*=-1;
-      if(mx>0){
-        var dx=mx-n.x,dy=my-n.y,d=Math.sqrt(dx*dx+dy*dy);
-        if(d<100){n.vx+=dx*.0002;n.vy+=dy*.0002;}
-        n.vx=Math.max(-1,Math.min(1,n.vx));
-        n.vy=Math.max(-1,Math.min(1,n.vy));
-      }
-      for(var j=i+1;j<nodes.length;j++){
-        var b=nodes[j],dx2=n.x-b.x,dy2=n.y-b.y,dist=Math.sqrt(dx2*dx2+dy2*dy2);
-        if(dist<130){
-          ctx.strokeStyle='rgba(0,212,255,'+(0.1*(1-dist/130))+')';
-          ctx.lineWidth=.5; ctx.beginPath(); ctx.moveTo(n.x,n.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-        }
-      }
-      var p=.6+.4*Math.sin(n.pulse);
-      ctx.beginPath(); ctx.arc(n.x,n.y,n.r*p,0,Math.PI*2);
-      ctx.fillStyle='rgba(0,212,255,'+(0.45*p)+')'; ctx.fill();
-    });
-
-    requestAnimationFrame(draw);
-  }
-
-  resize();
-  window.addEventListener('resize', resize);
-  draw();
-
-  // Stop when gate hidden
-  var obs=new MutationObserver(function(ms){
-    ms.forEach(function(m){
-      if(m.target.classList.contains('hidden')||m.target.style.display==='none') animRunning=false;
-    });
-  });
-  if(gate) obs.observe(gate,{attributes:true,attributeFilter:['class','style']});
-})();
-
-// ── Orbital core animation ─────────────────────────────────────────────────────
-(function(){
-  var cc=document.getElementById('orb-canvas');
-  if(!cc) return;
-  var ctx=cc.getContext('2d'), t=0;
-  var W=160, H=160, cx=80, cy=80;
-  function draw(){
-    ctx.clearRect(0,0,W,H);
-    // Outer glow ring
-    var outerGlow=ctx.createRadialGradient(cx,cy,30,cx,cy,75);
-    outerGlow.addColorStop(0,'rgba(124,58,237,0.08)');
-    outerGlow.addColorStop(1,'transparent');
-    ctx.fillStyle=outerGlow; ctx.fillRect(0,0,W,H);
-    // Orbiting nodes
-    for(var i=0;i<12;i++){
-      var angle=(i/12)*Math.PI*2+t;
-      var x=cx+Math.cos(angle)*52, y=cy+Math.sin(angle)*52;
-      var p=.5+.5*Math.sin(t*3+i);
-      var g=ctx.createRadialGradient(x,y,0,x,y,8);
-      g.addColorStop(0,'rgba(0,212,255,'+(0.9*p)+')');
-      g.addColorStop(1,'transparent');
-      ctx.fillStyle=g;
-      ctx.beginPath(); ctx.arc(x,y,3+p*2.5,0,Math.PI*2); ctx.fill();
-    }
-    // Inner nodes
-    for(var i=0;i<6;i++){
-      var angle=(i/6)*Math.PI*2-t*1.5;
-      var x=cx+Math.cos(angle)*28, y=cy+Math.sin(angle)*28;
-      var p=.5+.5*Math.sin(t*4+i);
-      var g=ctx.createRadialGradient(x,y,0,x,y,5);
-      g.addColorStop(0,'rgba(124,58,237,'+(0.8*p)+')');
-      g.addColorStop(1,'transparent');
-      ctx.fillStyle=g;
-      ctx.beginPath(); ctx.arc(x,y,2+p*2,0,Math.PI*2); ctx.fill();
-    }
-    // Core glow — large and bright
-    var cg=ctx.createRadialGradient(cx,cy,0,cx,cy,38);
-    cg.addColorStop(0,'rgba(200,180,255,0.95)');
-    cg.addColorStop(0.3,'rgba(124,58,237,0.85)');
-    cg.addColorStop(0.7,'rgba(0,212,255,0.35)');
-    cg.addColorStop(1,'transparent');
-    ctx.fillStyle=cg;
-    ctx.beginPath(); ctx.arc(cx,cy,34+Math.sin(t*2)*4,0,Math.PI*2); ctx.fill();
-    // Inner bright core
-    var ic=ctx.createRadialGradient(cx,cy,0,cx,cy,16);
-    ic.addColorStop(0,'rgba(255,255,255,0.9)');
-    ic.addColorStop(0.5,'rgba(180,140,255,0.6)');
-    ic.addColorStop(1,'transparent');
-    ctx.fillStyle=ic;
-    ctx.beginPath(); ctx.arc(cx,cy,14+Math.sin(t*3)*2,0,Math.PI*2); ctx.fill();
-    // Connecting lines
-    ctx.strokeStyle='rgba(0,212,255,0.08)'; ctx.lineWidth=0.8;
-    for(var i=0;i<6;i++){
-      var a1=(i/6)*Math.PI*2+t;
-      var a2=((i+6)/12)*Math.PI*2+t;
-      ctx.beginPath();
-      ctx.moveTo(cx+Math.cos(a1)*52,cy+Math.sin(a1)*52);
-      ctx.lineTo(cx+Math.cos(a2+Math.PI)*52,cy+Math.sin(a2+Math.PI)*52);
-      ctx.stroke();
-    }
-    t+=.014; requestAnimationFrame(draw);
-  }
-  draw();
-})();
-
-// ── Confidence counter ────────────────────────────────────────────────────────
-(function(){
-  var el=document.getElementById('lp-conf');
-  if(!el) return;
-  var t=0;
-  setInterval(function(){t+=.1; el.textContent=(97.2+Math.sin(t)*.9).toFixed(1)+'%';},220);
-})();
-
-// ── Crash counter ticker ──────────────────────────────────────────────────────
-(function(){
-  var el=document.getElementById('ls-crashes');
-  if(!el) return;
-  var n=308;
-  setInterval(function(){if(Math.random()>.97){n++;el.textContent=n;}},4000);
-})();
-</script>
-</body></html>');
+    win.document.write('</body></html>');
     win.document.close();
     setTimeout(function() { win.print(); }, 500);
-
   }
 }
+</script>
 
-
+<script>
 // ══════════════════════════════════════════════════════
 //  FEEDBACK — "Did the fix work?" button handler
 // ══════════════════════════════════════════════════════
@@ -4422,7 +4212,6 @@ async function sendFeedback(worked) {
       } else {
         status.textContent = '❌ Got it — try the follow-up chat below to refine the fix.';
         status.style.color = '#ff3b30';
-        // Scroll to follow-up chat
         var fs = document.getElementById('followup-section');
         if (fs) setTimeout(function() { fs.scrollIntoView({ behavior: 'smooth' }); }, 500);
       }
@@ -4434,8 +4223,6 @@ async function sendFeedback(worked) {
     }
   }
 }
-
-/* gate handled in <head> */
 </script>
 
 
