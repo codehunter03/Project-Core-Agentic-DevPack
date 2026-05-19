@@ -1253,8 +1253,7 @@ async function loadUserPlan(userId) {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/userplan', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Team-Token': 'CDA-AUTH' },
-      body: JSON.stringify({ user_id: userId, email: currentUser?.email || '' })
+      body: JSON.stringify({ user_id: userId, email: currentUser?.email || '', team_token: 'CDA-AUTH' })
     });
     if (resp.ok) {
       var d = await resp.json();
@@ -1478,8 +1477,7 @@ async function incrementUsage() {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/increment', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Team-Token': 'CDA-AUTH' },
-      body: JSON.stringify({ user_id: currentUser.id })
+      body: JSON.stringify({ user_id: currentUser.id, team_token: 'CDA-AUTH' })
     });
     if (resp.ok) {
       var d = await resp.json();
@@ -3028,13 +3026,9 @@ async function runAnalysis() {
         resp = await fetch(LAMBDA, {
           method:  'POST',
           signal:  controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Api-Key':    apiKey,
-            'X-Team-Token': 'CDA-AUTH',
-            'X-User-Id':    currentUser ? currentUser.id : 'anon',
-          },
           body: JSON.stringify({
+            team_token:      'CDA-AUTH',
+            user_id:         currentUser ? currentUser.id : 'anon',
             backtrace:       btSend,
             source:          src.length > 3000 ? src.slice(0, 3000) + '\n...[truncated]' : src,
             filename:        curFname,
@@ -3257,12 +3251,7 @@ async function sendFollowup() {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key':    apiKey,
-        'X-Team-Token': 'CDA-AUTH',
-      },
-      body: JSON.stringify({ messages: chatHistory })
+      body: JSON.stringify({ messages: chatHistory, team_token: 'CDA-AUTH' })
     });
 
     if (!resp.ok) {
@@ -3451,12 +3440,7 @@ async function runAdvisor() {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/advisor', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key':    apiKey,
-        'X-Team-Token': teamToken,
-      },
-      body: JSON.stringify({ backtrace: bt })
+      body: JSON.stringify({ backtrace: bt, team_token: 'CDA-AUTH' })
     });
 
     if (!resp.ok) {
@@ -3682,7 +3666,6 @@ async function runSelfTest() {
   try {
     var pingResp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/health', {
       method: 'GET',
-      headers: { 'X-Api-Key': apiKey, 'X-Team-Token': 'CDA-AUTH' }
     });
 
     if (pingResp.status === 200) {
@@ -3715,15 +3698,11 @@ async function runSelfTest() {
   try {
     var accResp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key':    apiKey,
-        'X-Team-Token': 'CDA-AUTH',
-      },
       body: JSON.stringify({
-        backtrace: ST_BACKTRACE,
-        source:    ST_SOURCE,
-        filename:  'processor.c',
+        team_token: 'CDA-AUTH',
+        backtrace:  ST_BACKTRACE,
+        source:     ST_SOURCE,
+        filename:   'processor.c',
       })
     });
 
@@ -4360,12 +4339,7 @@ async function sendFeedback(worked) {
 
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/feedback', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key':    apiKey,
-        'X-Team-Token': teamToken,
-      },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, team_token: 'CDA-AUTH' }),
     });
 
     if (status) {
