@@ -4442,6 +4442,12 @@ async function sendFeedback(worked) {
 <script>
 // ── Landing page transitions ──────────────────────────────────────────────────
 
+function showSignIn() {
+  var landing = document.getElementById('gate-landing');
+  var panel   = document.getElementById('gate-signin-panel');
+  if (landing) { landing.classList.add('hide'); landing.style.display='none'; }
+  if (panel)   { panel.style.display='flex'; panel.classList.add('show'); }
+}
 
 function showDemoVideo() {
   var modal = document.getElementById('demo-modal');
