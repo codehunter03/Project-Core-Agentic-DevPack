@@ -1739,15 +1739,15 @@ function toggleGateEye() {}
       <div class="landing-left">
         <div class="landing-eyebrow">⚡ Production AI Infrastructure</div>
         <h1 class="landing-h1">AI-Powered<br><span>Core Dump</span><br>Analysis</h1>
-        <p class="landing-sub">Instantly detect, decode, and resolve production crashes with real-time AI debugging intelligence. Root cause in 10 seconds.</p>
+        <p class="landing-sub">AI-powered GDB core dump analysis — root cause, exact fix, and RCA document in under 30 seconds.</p>
         <div class="landing-btns">
           <button class="btn-analyze" onclick="showSignIn();showView('signup')">Analyze Core Dump</button>
           <button class="btn-demo" onclick="showDemoVideo()">▶ View Live Demo</button>
         </div>
         <div class="landing-stats">
           <div class="lstat"><div class="lstat-num" id="ls-crashes">308</div><div class="lstat-lbl">Crashes Solved</div></div>
-          <div class="lstat"><div class="lstat-num">10s</div><div class="lstat-lbl">Avg Analysis</div></div>
-          <div class="lstat"><div class="lstat-num">98.2%</div><div class="lstat-lbl">Confidence</div></div>
+          <div class="lstat"><div class="lstat-num">&lt;30s</div><div class="lstat-lbl">Avg Analysis</div></div>
+          <div class="lstat"><div class="lstat-num">11</div><div class="lstat-lbl">Crash Types</div></div>
         </div>
       </div>
 
@@ -1763,7 +1763,7 @@ function toggleGateEye() {}
 
         <!-- Floating panels -->
         <div class="lp lp1"><div class="lp-label"><span class="lp-dot dot-r"></span>Crash Detected</div><div class="lp-val">SIGABRT · Double Free</div></div>
-        <div class="lp lp2"><div class="lp-label"><span class="lp-dot dot-b"></span>AI Confidence</div><div class="lp-val" id="lp-conf">97.8%</div></div>
+        <div class="lp lp2"><div class="lp-label"><span class="lp-dot dot-b"></span>Fix Verdict</div><div class="lp-val">SAFE ✓</div></div>
         <div class="lp lp3"><div class="lp-label"><span class="lp-dot dot-g"></span>Root Cause ID</div><div class="lp-val">consumer():47</div></div>
         <div class="lp lp4"><div class="lp-label"><span class="lp-dot dot-a"></span>Memory Analysis</div><div class="lp-val">tcache corruption</div></div>
         <div class="lp lp5"><div class="lp-label"><span class="lp-dot dot-g"></span>Fix Validated</div><div class="lp-val">unique_ptr SAFE ✓</div></div>
@@ -1777,21 +1777,21 @@ function toggleGateEye() {}
     <div class="landing-ticker">
       <div class="ticker-track" id="ticker">
         <span class="ticker-item"><span>307</span> Crashes Analyzed</span>
-        <span class="ticker-item"><span>10s</span> Avg Root Cause</span>
+        <span class="ticker-item"><span>&lt;30s</span> Avg Analysis</span>
         <span class="ticker-item"><span>3</span> AI Agents</span>
-        <span class="ticker-item"><span>85%</span> Similarity Matching</span>
+        <span class="ticker-item"><span>11</span> Crash Types</span>
+        <span class="ticker-item"><span>8</span> Languages</span>
         <span class="ticker-item"><span>$0.003</span> Per Analysis</span>
-        <span class="ticker-item"><span>5</span> Bug Categories</span>
-        <span class="ticker-item"><span>✓</span> PKCE Secured</span>
+        <span class="ticker-item"><span>✓</span> No Code Stored</span>
         <span class="ticker-item"><span>∞</span> Institutional Memory</span>
         <!-- duplicate for seamless loop -->
         <span class="ticker-item"><span>307</span> Crashes Analyzed</span>
-        <span class="ticker-item"><span>10s</span> Avg Root Cause</span>
+        <span class="ticker-item"><span>&lt;30s</span> Avg Analysis</span>
         <span class="ticker-item"><span>3</span> AI Agents</span>
-        <span class="ticker-item"><span>85%</span> Similarity Matching</span>
+        <span class="ticker-item"><span>11</span> Crash Types</span>
+        <span class="ticker-item"><span>8</span> Languages</span>
         <span class="ticker-item"><span>$0.003</span> Per Analysis</span>
-        <span class="ticker-item"><span>5</span> Bug Categories</span>
-        <span class="ticker-item"><span>✓</span> PKCE Secured</span>
+        <span class="ticker-item"><span>✓</span> No Code Stored</span>
         <span class="ticker-item"><span>∞</span> Institutional Memory</span>
       </div>
     </div>
@@ -1877,14 +1877,17 @@ function toggleGateEye() {}
       <div class="gate-right-glyph">🔬</div>
       <div class="gate-right-title">AI-Powered<br>Crash Analysis</div>
       <div class="gate-right-sub">
-        Paste a GDB core dump and get root cause,<br>
-        fix, and RCA doc in under 30 seconds.
+        Paste a GDB core dump — get root cause, exact fix,<br>
+        and a JIRA-ready RCA doc in under 30 seconds.
       </div>
       <div class="gate-right-stats">
-        <div class="gate-stat"><span>⚡</span> 30 second AI analysis</div>
-        <div class="gate-stat"><span>🔧</span> Auto-generated code fix</div>
-        <div class="gate-stat"><span>📄</span> One-click RCA PDF for JIRA</div>
-        <div class="gate-stat"><span>🧠</span> Learns from every crash</div>
+        <div class="gate-stat"><span>⚡</span> Root cause in under 30 seconds</div>
+        <div class="gate-stat"><span>🐛</span> 11 crash types · 8 languages</div>
+        <div class="gate-stat"><span>🤖</span> 3 AI agents — RCA, Validation, Correlation</div>
+        <div class="gate-stat"><span>🔧</span> Auto-generated fix with exact buggy line</div>
+        <div class="gate-stat"><span>📄</span> One-click RCA doc for JIRA post-mortems</div>
+        <div class="gate-stat"><span>🔒</span> Source analyzed in memory — never stored</div>
+        <div class="gate-stat"><span>🧠</span> Learns from engineer feedback over time</div>
       </div>
     </div>
 
@@ -2076,13 +2079,20 @@ void causeCrash() {
       <div class="empty-glyph">🔬</div>
       <div class="empty-h">Ready to Analyze Core Dumps</div>
       <div class="empty-steps">
-        <div>① Paste your GDB backtrace below</div>
-        <div>② Upload your source file</div>
-        <div>③ File advisor auto-scans required files</div>
-        <div>④ Click Investigate Crash</div>
-        <div>⑤ Click <code>🔍 Investigate Crash</code></div>
+        <div>① Paste your GDB backtrace (must contain at least #0)</div>
+        <div>② Upload or paste the relevant source file</div>
+        <div>③ File Advisor auto-identifies which files are needed</div>
+        <div>④ Click <code>🔍 Investigate Crash</code></div>
       </div>
-      <div style="font-size:.62rem;color:var(--t3)">C · C++ · Python · Go · Rust · Java · JS · TS</div>
+      <div style="font-size:.62rem;color:var(--t3);margin-top:.5rem;line-height:1.8">
+        <strong style="color:var(--t2)">Core Capabilities</strong><br>
+        Root cause in &lt;30s · 11 crash types · 8 languages · Auto-generated fix<br>
+        Side-by-side diff · Iterative fix chat · One-click RCA doc for JIRA<br>
+        <strong style="color:var(--t2)">3 AI Agents</strong><br>
+        Evidence-Based RCA · Fix Validation (SAFE/CAUTION/UNSAFE) · Crash Correlation<br>
+        <strong style="color:var(--t2)">Security</strong><br>
+        Source analyzed in memory only — never stored · Google OAuth · Row Level Security
+      </div>
     </div>
 
     <!-- Result -->
