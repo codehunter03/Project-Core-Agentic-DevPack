@@ -2018,7 +2018,7 @@ Local variables:
     <!-- Source Files — multi upload -->
     <div>
       <div class="field-lbl">
-        ◈ Source Files
+        ◈ Source Files <span style="font-size:.65rem;color:var(--t3);font-weight:400">— upload up to 5 files (real crashes span multiple)</span>
         <label class="upload-lbl" id="multi-upload-lbl">
           📁 Upload Files
           <input type="file" id="file-in" style="display:none" multiple
@@ -2117,11 +2117,17 @@ void causeCrash() {
         <button class="tab" onclick="tab('correlations',this);loadCorrelations()" id="corr-tab">🔗 Correlations</button>
         <button class="tab" onclick="tab('validation',this);runFixValidation()" id="validation-tab">🛡 Validation</button>
         <button class="tab" onclick="tab('rca',this);renderRCA()" style="color:#da3633;font-weight:700">📄 RCA Doc</button>
+        <button class="tab" onclick="tab('history',this);renderHistory()" id="history-tab">🕓 History</button>
       </div>
 
       <!-- Analysis pane -->
       <div class="tpane on" id="tp-analysis">
         <div style="display:flex;flex-direction:column;gap:.75rem">
+          <!-- Confidence evidence breakdown -->
+          <div id="conf-evidence" style="display:none">
+            <div class="slbl">Why This Confidence Score</div>
+            <div class="card" id="conf-evidence-body" style="font-size:.75rem;line-height:1.9;color:var(--t2)"></div>
+          </div>
           <div><div class="slbl">Root Cause Explanation</div><div class="card" id="r-exp">—</div></div>
           <div><div class="slbl">Fix Explanation</div><div class="card grn" id="r-fix">—</div></div>
 
@@ -2209,6 +2215,19 @@ void causeCrash() {
           </button>
         </div>
         <div id="rca-preview" style="background:#fff;border-radius:6px;overflow:auto;max-height:500px;"></div>
+      </div>
+
+      <!-- History pane -->
+      <div class="tpane" id="tp-history">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+          <div class="slbl" style="margin:0">🕓 Analysis History (this browser)</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="history-search" type="text" placeholder="Search..." oninput="renderHistory()"
+              style="background:var(--s2);border:1px solid var(--s4);border-radius:5px;padding:4px 10px;font-size:.72rem;color:var(--t1);font-family:inherit;width:160px">
+            <button onclick="clearHistory()" style="background:none;border:1px solid var(--s4);border-radius:5px;padding:4px 10px;font-size:.7rem;color:var(--t3);cursor:pointer;font-family:inherit">Clear all</button>
+          </div>
+        </div>
+        <div id="history-list" style="display:flex;flex-direction:column;gap:.4rem;max-height:420px;overflow-y:auto"></div>
       </div>
 
       <!-- Suggestions pane -->
@@ -2466,7 +2485,7 @@ function renderDiff(el, orig, fixed) {
   var rems = hunks.filter(function(h) { return h.t === 'rem'; }).length;
 
   // Build visible hunks — context window of 3 around each change
-  var CONTEXT = 3;
+  var CONTEXT = 5;
   var visible  = new Set();
   changed.forEach(function(ch) {
     var idx = hunks.indexOf(ch);
@@ -2730,6 +2749,23 @@ function renderResult(r) {
     ${r.faulting_function?`<span class="pill" style="color:#d2a8ff;border-color:#d2a8ff;background:transparent">fn: ${r.faulting_function}</span>`:''}
     ${r.faulting_line?`<span class="pill" style="color:#58a6ff;border-color:#58a6ff;background:transparent">line: ${r.faulting_line}</span>`:''}
   `;
+  // ── Confidence evidence breakdown ──
+  (function() {
+    var ev = document.getElementById('conf-evidence');
+    var evBody = document.getElementById('conf-evidence-body');
+    if (!ev || !evBody) return;
+    var checks = [];
+    var tick = '<span style="color:#56d364">✔</span>';
+    var cross = '<span style="color:#f85149">✘</span>';
+    checks.push((r.originalSource ? tick : cross) + ' Source file ' + (r.originalSource ? 'uploaded — line-level matching enabled' : 'not uploaded — confidence limited to backtrace only'));
+    checks.push((r.faulting_function ? tick : cross) + ' Faulting function ' + (r.faulting_function ? 'identified: <code>' + esc(r.faulting_function) + '</code>' : 'not identified in backtrace'));
+    checks.push((r.faulting_line ? tick : cross) + ' Faulting line ' + (r.faulting_line ? 'pinpointed: line ' + r.faulting_line : 'not resolved'));
+    var hasSignal = r.verified_findings && (r.verified_findings.includes('SIG') || r.verified_findings.includes('signal') || r.verified_findings.includes('fault'));
+    checks.push((hasSignal ? tick : '<span style="color:#e3b341">~</span>') + ' Crash signal ' + (hasSignal ? 'present in verified findings' : 'not explicitly matched'));
+    if (r.confidence_rationale) checks.push('<span style="color:#58a6ff">ℹ</span> AI rationale: ' + esc(r.confidence_rationale));
+    evBody.innerHTML = checks.join('<br>');
+    ev.style.display = 'block';
+  })();
   document.getElementById('r-exp').textContent=r.explanation||'—';
   document.getElementById('r-fix').textContent=r.fix_explanation||'—';
   const rOrig = document.getElementById('r-orig'); if(rOrig) renderCode(rOrig,r.originalSource,r.faulting_line);
@@ -2771,6 +2807,81 @@ function renderResult(r) {
 // ══════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════════
+// ── Analysis history (localStorage) ──────────────────────────────────────────
+var HISTORY_KEY = 'cda-analyses-history';
+var HISTORY_MAX = 30;
+
+function saveToHistory(r) {
+  if (!r || !r.root_cause) return;
+  try {
+    var items = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    items.unshift({
+      ts:           Date.now(),
+      fileName:     r.fileName     || 'unknown',
+      bug_category: r.bug_category || 'Unknown',
+      severity:     r.severity     || 'Unknown',
+      confidence:   r.confidence   || 'Unknown',
+      root_cause:   r.root_cause   || '',
+      result:       r,
+    });
+    if (items.length > HISTORY_MAX) items = items.slice(0, HISTORY_MAX);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+  } catch(e) {}
+}
+
+function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+}
+
+function renderHistory() {
+  var list = document.getElementById('history-list');
+  if (!list) return;
+  var query = (document.getElementById('history-search') || {}).value || '';
+  query = query.toLowerCase();
+  var items = [];
+  try { items = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(e) {}
+  if (!items.length) {
+    list.innerHTML = '<div style="color:var(--t3);font-size:.75rem;padding:.5rem">No analyses saved yet — run your first analysis to start building history.</div>';
+    return;
+  }
+  var filtered = query ? items.filter(function(i) {
+    return (i.bug_category + i.root_cause + i.fileName + i.severity).toLowerCase().includes(query);
+  }) : items;
+  if (!filtered.length) {
+    list.innerHTML = '<div style="color:var(--t3);font-size:.75rem;padding:.5rem">No results match "' + esc(query) + '".</div>';
+    return;
+  }
+  list.innerHTML = '';
+  filtered.forEach(function(item, idx) {
+    var date = new Date(item.ts).toLocaleString();
+    var sevColor = item.severity === 'Critical' ? '#f85149' : item.severity === 'High' ? '#e3b341' : '#56d364';
+    var confDots = item.confidence === 'High' ? '⬤⬤⬤' : item.confidence === 'Medium' ? '⬤⬤◯' : '⬤◯◯';
+    var confColor = item.confidence === 'High' ? '#56d364' : item.confidence === 'Medium' ? '#e3b341' : '#8b949e';
+    var row = document.createElement('div');
+    row.style.cssText = 'background:var(--s2);border:1px solid var(--s4);border-radius:6px;padding:.6rem .8rem;cursor:pointer;transition:border-color .15s';
+    row.onmouseover = function(){ this.style.borderColor='#58a6ff'; };
+    row.onmouseout  = function(){ this.style.borderColor=''; };
+    row.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span style="font-size:.7rem;color:var(--t3)">' + date + '</span>' +
+          '<span style="font-size:.72rem;font-family:monospace;color:#d2a8ff">' + esc(item.fileName) + '</span>' +
+          '<span style="font-size:.7rem;font-weight:700;color:' + sevColor + '">' + esc(item.severity) + '</span>' +
+          '<span style="font-size:.7rem;color:' + confColor + '">' + confDots + ' ' + esc(item.confidence) + '</span>' +
+        '</div>' +
+        '<span style="font-size:.7rem;font-weight:700;color:#58a6ff">' + esc(item.bug_category) + '</span>' +
+      '</div>' +
+      '<div style="font-size:.72rem;color:var(--t2);margin-top:.3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(item.root_cause) + '</div>';
+    row.onclick = function() {
+      curResult = item.result;
+      renderResult(item.result);
+      tab('analysis', document.querySelectorAll('.tab')[0]);
+    };
+    list.appendChild(row);
+  });
+}
+
 // ── Degraded / offline banner ─────────────────────────────────────────────────
 function showDegradedBanner(reason) {
   var existing = document.getElementById('degraded-banner');
@@ -2994,6 +3105,7 @@ async function runAnalysis() {
     lg('✅ Analysis complete in ' + elapsed + 's!', 'ok');
     setStep(5); // Mark all steps complete — no more 'live' bar
     renderResult(curResult);
+    saveToHistory(curResult);
     renderEvidenceAgent(curResult);
     // Increment usage counter
     await incrementUsage();
