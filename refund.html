@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refund Policy — CoreDumpAnalyzer</title>
+<meta name="description" content="CoreDumpAnalyzer refund policy for Pro subscriptions.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%230d1117'/><text y='50' x='8' font-size='38' font-family='monospace' fill='%2358a6ff' font-weight='bold'>&gt;_</text><text y='85' x='8' font-size='22' font-family='monospace' fill='%2356d364'>CD</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#07090d;--s1:#0d1117;--s2:#161b22;--s4:#21262d;--s5:#30363d;
+  --t1:#e6edf3;--t2:#c9d1d9;--t3:#8b949e;--t4:#6e7681;
+  --blue:#58a6ff;--cyan:#00d4ff;--green:#56d364;
+}
+body{background:var(--bg);color:var(--t2);font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.7;min-height:100vh;}
+
+/* Nav */
+nav{background:var(--s1);border-bottom:1px solid var(--s4);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;}
+.nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--t1);text-decoration:none;display:flex;align-items:center;gap:10px;}
+.nav-logo span{color:var(--cyan);}
+.nav-links{display:flex;gap:24px;}
+.nav-links a{color:var(--t3);text-decoration:none;font-size:13px;}
+.nav-links a:hover{color:var(--t1);}
+
+/* Hero */
+.hero{background:linear-gradient(180deg,var(--s1) 0%,var(--bg) 100%);border-bottom:1px solid var(--s4);padding:48px 2rem 40px;text-align:center;}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);border-radius:20px;padding:4px 14px;font-size:11px;color:var(--cyan);letter-spacing:1px;text-transform:uppercase;margin-bottom:16px;}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(24px,4vw,40px);font-weight:800;color:var(--t1);margin-bottom:10px;}
+.hero p{font-size:13px;color:var(--t3);max-width:480px;margin:0 auto;}
+.hero-date{font-size:11px;color:var(--t4);margin-top:12px;}
+
+/* Content */
+.container{max-width:760px;margin:0 auto;padding:48px 2rem 80px;}
+.section{margin-bottom:40px;}
+.section h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--t1);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--s4);}
+.section h3{font-size:13px;font-weight:600;color:var(--cyan);margin:20px 0 8px;text-transform:uppercase;letter-spacing:.5px;}
+.section p{color:var(--t3);margin-bottom:12px;font-size:13px;}
+.section ul{color:var(--t3);padding-left:20px;font-size:13px;}
+.section ul li{margin-bottom:8px;}
+.section ul li::marker{color:var(--cyan);}
+
+/* Highlight boxes */
+.box{background:var(--s1);border:1px solid var(--s4);border-radius:10px;padding:20px 24px;margin:16px 0;}
+.box.green{border-color:rgba(86,211,100,.25);background:rgba(86,211,100,.04);}
+.box.blue{border-color:rgba(0,212,255,.2);background:rgba(0,212,255,.04);}
+.box.amber{border-color:rgba(227,179,65,.25);background:rgba(227,179,65,.04);}
+.box-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;}
+.box.green .box-title{color:var(--green);}
+.box.blue .box-title{color:var(--cyan);}
+.box.amber .box-title{color:#e3b341;}
+.box p{color:var(--t2);font-size:13px;margin:0;}
+
+/* Table */
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;}
+th{background:var(--s2);color:var(--t3);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:10px 14px;text-align:left;border:1px solid var(--s4);}
+td{padding:10px 14px;border:1px solid var(--s4);color:var(--t3);}
+tr:nth-child(even) td{background:var(--s1);}
+td:first-child{color:var(--t2);font-weight:600;}
+
+/* Contact */
+.contact-box{background:var(--s2);border:1px solid var(--s4);border-radius:10px;padding:24px;margin-top:40px;text-align:center;}
+.contact-box h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--t1);margin-bottom:8px;}
+.contact-box p{font-size:13px;color:var(--t3);margin-bottom:4px;}
+.contact-box a{color:var(--cyan);text-decoration:none;}
+.contact-box a:hover{text-decoration:underline;}
+
+/* Footer */
+footer{background:var(--s1);border-top:1px solid var(--s4);padding:24px 2rem;text-align:center;}
+.footer-links{display:flex;gap:20px;justify-content:center;margin-bottom:12px;flex-wrap:wrap;}
+.footer-links a{color:var(--t4);font-size:12px;text-decoration:none;}
+.footer-links a:hover{color:var(--t2);}
+.footer-copy{font-size:11px;color:var(--t4);}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <a href="/" class="nav-logo"><span>&gt;_</span> CoreDumpAnalyzer</a>
+  <div class="nav-links">
+    <a href="/privacy.html">Privacy</a>
+    <a href="/terms.html">Terms</a>
+    <a href="/">Back to App</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-badge">📋 Legal</div>
+  <h1>Refund Policy</h1>
+  <p>Our commitment to fair and transparent billing for CoreDumpAnalyzer Pro subscribers.</p>
+  <div class="hero-date">Last updated: June 2026</div>
+</div>
+
+<!-- Content -->
+<div class="container">
+
+  <div class="box green">
+    <div class="box-title">✅ Our Commitment</div>
+    <p>We stand behind CoreDumpAnalyzer. If the product doesn't work as described, we will make it right — either by fixing the issue or issuing a refund.</p>
+  </div>
+
+  <!-- Section 1 -->
+  <div class="section">
+    <h2>1. Overview</h2>
+    <p>This Refund Policy applies to all paid subscriptions to CoreDumpAnalyzer ("the Service"), operated by Devendra Pillay ("we", "us", "our"). By subscribing to the Pro plan, you agree to this policy.</p>
+    <p>CoreDumpAnalyzer is a SaaS (Software as a Service) product. All purchases are processed securely through Lemon Squeezy, our payment provider.</p>
+  </div>
+
+  <!-- Section 2 -->
+  <div class="section">
+    <h2>2. Free Trial</h2>
+    <p>Before subscribing, every user receives <strong style="color:var(--t1)">3 free analyses</strong> with no credit card required. We strongly encourage you to use the free tier to evaluate the tool before purchasing a Pro subscription.</p>
+    <div class="box blue">
+      <div class="box-title">💡 Try Before You Buy</div>
+      <p>The free tier gives you full access to the analysis engine, Evidence Agent, Fix Validation Agent, and Correlation Engine. You can evaluate the quality of results before committing to a subscription.</p>
+    </div>
+  </div>
+
+  <!-- Section 3 -->
+  <div class="section">
+    <h2>3. Refund Eligibility</h2>
+    <h3>Eligible for Refund</h3>
+    <ul>
+      <li>You request a refund within <strong style="color:var(--t1)">7 days</strong> of your first Pro subscription payment.</li>
+      <li>The Service was not available for more than 24 consecutive hours due to issues on our end during your billing period.</li>
+      <li>You were charged incorrectly or charged more than once for the same billing period.</li>
+      <li>A technical defect prevented you from using core features of the Service and we were unable to resolve it within 5 business days.</li>
+    </ul>
+
+    <h3>Not Eligible for Refund</h3>
+    <ul>
+      <li>Refund requests made more than 7 days after the charge date.</li>
+      <li>Subscription renewals — if you do not cancel before the renewal date, the charge is non-refundable.</li>
+      <li>Partial month usage — we do not pro-rate refunds for unused days within a billing period.</li>
+      <li>Dissatisfaction with AI analysis results — AI outputs are probabilistic by nature. We cannot guarantee specific results for every crash type.</li>
+      <li>Accounts suspended or terminated for violating our Terms of Service.</li>
+    </ul>
+  </div>
+
+  <!-- Section 4 -->
+  <div class="section">
+    <h2>4. Subscription Cancellation</h2>
+    <p>You may cancel your Pro subscription at any time. Cancellation takes effect at the end of the current billing period — you retain Pro access until that date.</p>
+
+    <table>
+      <tr>
+        <th>Action</th>
+        <th>Effect</th>
+        <th>When</th>
+      </tr>
+      <tr>
+        <td>Cancel subscription</td>
+        <td>No further charges</td>
+        <td>Immediately</td>
+      </tr>
+      <tr>
+        <td>Pro access</td>
+        <td>Remains active</td>
+        <td>Until end of billing period</td>
+      </tr>
+      <tr>
+        <td>Account data</td>
+        <td>Retained</td>
+        <td>Accessible after downgrade</td>
+      </tr>
+      <tr>
+        <td>Analysis history</td>
+        <td>Retained</td>
+        <td>Always accessible</td>
+      </tr>
+    </table>
+
+    <div class="box amber">
+      <div class="box-title">⚠️ Important</div>
+      <p>Cancelling your subscription does not automatically trigger a refund. To request a refund in addition to cancellation, please contact us separately using the details below.</p>
+    </div>
+  </div>
+
+  <!-- Section 5 -->
+  <div class="section">
+    <h2>5. How to Request a Refund</h2>
+    <p>To request a refund, contact us at the email address below with the following details:</p>
+    <ul>
+      <li>The email address associated with your CoreDumpAnalyzer account</li>
+      <li>The date of the charge you are disputing</li>
+      <li>The reason for your refund request</li>
+      <li>Your Lemon Squeezy order number (found in your payment receipt email)</li>
+    </ul>
+    <p>We aim to respond to all refund requests within <strong style="color:var(--t1)">2 business days</strong>. Approved refunds are processed through Lemon Squeezy and typically appear on your statement within 5–10 business days depending on your bank.</p>
+  </div>
+
+  <!-- Section 6 -->
+  <div class="section">
+    <h2>6. Chargebacks</h2>
+    <p>We ask that you contact us before initiating a chargeback with your bank or card provider. Chargebacks incur fees that hurt small independent developers. We are happy to resolve any billing issues directly and promptly.</p>
+    <p>Accounts that initiate chargebacks without first contacting us may be suspended pending resolution.</p>
+  </div>
+
+  <!-- Section 7 -->
+  <div class="section">
+    <h2>7. Changes to This Policy</h2>
+    <p>We reserve the right to update this Refund Policy at any time. Changes will be posted on this page with an updated date. Continued use of the Service after changes are posted constitutes acceptance of the updated policy.</p>
+  </div>
+
+  <!-- Contact -->
+  <div class="contact-box">
+    <h3>Questions About a Refund?</h3>
+    <p>We're here to help. Reach out directly and we'll resolve it quickly.</p>
+    <p style="margin-top:12px;"><a href="mailto:support@coredumpanalyzer.com">support@coredumpanalyzer.com</a></p>
+    <p style="font-size:11px;color:var(--t4);margin-top:8px;">We respond within 2 business days</p>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/terms.html">Terms of Service</a>
+    <a href="/privacy.html">Privacy Policy</a>
+    <a href="/refund.html">Refund Policy</a>
+    <a href="mailto:support@coredumpanalyzer.com">Contact</a>
+  </div>
+  <div class="footer-copy">© 2026 CoreDumpAnalyzer · Devendra Pillay · All rights reserved</div>
+</footer>
+
+</body>
+</html>
