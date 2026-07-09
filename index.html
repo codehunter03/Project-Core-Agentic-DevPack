@@ -1922,7 +1922,7 @@ function toggleGateEye() {}
       <button class="upgrade-btn" onclick="goToCheckout()">Upgrade Now — $9.99/month</button>
       <button class="upgrade-skip" id="upgrade-skip-btn" onclick="closeUpgradeModal()">Maybe later</button>
     </div>
-    <div class="free-bar">🔒 Secured by Stripe &nbsp;·&nbsp; Cancel anytime</div>
+    <div class="free-bar">🔒 Secured by Stripe &nbsp;·&nbsp; Cancel anytime &nbsp;·&nbsp; <a href="/refund.html" style="color:inherit;text-decoration:underline;opacity:.7" target="_blank">Refund Policy</a></div>
   </div>
 </div>
 
@@ -2281,12 +2281,18 @@ void causeCrash() {
   </div><!-- /.rpanel -->
 </div><!-- /.workspace -->
 <div style="
-  text-align:center;padding:.6rem;
+  text-align:center;padding:.5rem .6rem .6rem;
   border-top:1px solid var(--s4);
   font-size:.6rem;color:var(--t3);
   background:var(--s1);
   letter-spacing:.5px;
 ">
+  <div style="margin-bottom:.35rem;display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+    <a href="/privacy.html" style="color:var(--t3);text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">Privacy Policy</a>
+    <a href="/terms.html" style="color:var(--t3);text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">Terms of Service</a>
+    <a href="/refund.html" style="color:var(--t3);text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">Refund Policy</a>
+    <a href="mailto:support@coredumpanalyzer.com" style="color:var(--t3);text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">Contact</a>
+  </div>
   CoreDumpAnalyzer &mdash; Core Dump Analyzer &amp; Auto-Fix Engine &nbsp;&bull;&nbsp;
   Developed by <strong style="color:var(--t2)">Devendra Pillay</strong> &copy; 2026
 </div>
