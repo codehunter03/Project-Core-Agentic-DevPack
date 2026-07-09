@@ -11,7 +11,7 @@
 
 ```
 URL      : https://coredumpanalyzer.com
-Password : DevPack@2024
+Password : (ask admin / see team password manager — never stored in this repo)
 API Key  : Each person gets their own at console.anthropic.com (~$5 credits)
 Cost     : ~$0.01 per crash analysis
 ```
@@ -41,7 +41,7 @@ TEAM_TOKEN → your-new-token
 ```bash
 git add index.html
 git commit -m "chore: update access password"
-git push --force
+git push
 ```
 
 ---
@@ -120,7 +120,7 @@ python main.py \
 ### Lambda Environment Variables
 | Key | Value |
 |---|---|
-| `TEAM_TOKEN` | `DevPackTeam2024!` |
+| `TEAM_TOKEN` | (see AWS Lambda console — never store the value here) |
 
 ### Lambda Routes
 | Route | Method | Purpose |
@@ -160,7 +160,7 @@ python main.py \
 # Frontend
 git add index.html
 git commit -m "your change"
-git push --force
+git push
 
 # Lambda — paste new index.mjs in AWS Console → Deploy
 ```

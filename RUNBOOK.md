@@ -15,6 +15,7 @@ Operational reference for admins and team members. For general usage see [README
 7. [Changing the Password](#7-changing-the-password)
 8. [Deploying Changes](#8-deploying-changes)
 9. [GitHub Pages Troubleshooting](#9-github-pages-troubleshooting)
+10. [Security Incidents & Credential Hygiene](#10-security-incidents--credential-hygiene)
 
 ---
 
@@ -229,3 +230,35 @@ The tool loads fonts from `fonts.googleapis.com`. Some networks or browser exten
 
 ### CORS error in DevTools console
 The `anthropic-dangerous-direct-browser-access: true` header is required for direct browser-to-API calls and is supported by Anthropic. If you see a CORS error, your browser extension (ad blocker, privacy shield) may be stripping this header — disable extensions for this site and retry.
+
+---
+
+## 10. Security Incidents & Credential Hygiene
+
+### 2026-07-10 incident log
+
+A pre-launch review of the refund policy flow led to a broader security sweep of this repo. Findings and fixes:
+
+| Finding | Fix |
+|---|---|
+| `origin` remote URL had a live GitHub PAT (`ghp_2F2s...`) embedded in plaintext in `.git/config` | Switched remote to SSH: `git@github.com:codehunter03/Project-Core-Agentic-DevPack.git` |
+| `README.md` contained the **live team password** and the **live Lambda `TEAM_TOKEN`** in plaintext — confirmed exposed publicly since 2026-04-09 (`c3041da`), verified via unauthenticated fetch to `raw.githubusercontent.com` | Redacted both from `README.md`; replaced with pointers to secure storage. Values are still the pre-rotation ones until [Outstanding rotation steps](#outstanding-rotation-steps-manual--requires-adminawsgithub-access-this-repo-doesnt-have) below are done — do not re-add them to any file, including this one |
+| `README.md` documented `git push --force` as the routine deploy command (password rotation + general deploy) | Changed both to plain `git push` — force-push should only ever be an explicit, confirmed, emergency action, as already documented in [Section 8](#8-deploying-changes) |
+| Upgrade modal + a code comment in `index.html` said "Stripe" when checkout actually runs through Lemon Squeezy | Corrected both to Lemon Squeezy |
+| `privacy.html` claimed "we do not share your data with third parties" directly above a list of third-party processors (Anthropic, Supabase, AWS Lambda, Lemon Squeezy) | Reworded to "we do not sell or share your data with third parties for marketing or advertising purposes" |
+| Stale `index.html_backup_main` / `index.html_tmp` files sitting untracked in the repo root, containing outdated (pre-fix) copy | Deleted — they were never deployed (deploy workflow only uploads the git-tracked checkout), but posed a risk of accidentally being committed and going live via a careless `git add -A` |
+
+### Outstanding rotation steps (manual — requires admin/AWS/GitHub access this repo doesn't have)
+
+These credentials were exposed in git history even after the docs were redacted — the working files are clean, but the values already went out to anyone who cloned or fetched the repo while it was public. Rotate both:
+
+1. **Revoke the old GitHub PAT** (`ghp_2F2s...`): GitHub → Settings → Developer settings → Personal access tokens → find it → Revoke.
+2. **Rotate the team password**: follow [Section 7](#7-changing-the-password) to generate a new hash and update `index.html`'s `HASH`. Communicate the new password to the team out-of-band (Slack DM, 1Password, etc). Never commit the plaintext password anywhere, including README/docs.
+3. **Rotate the Lambda `TEAM_TOKEN`**: AWS Console → Lambda → `devpack-api` → Configuration → Environment variables → set a new value. Communicate it out-of-band. Never commit the value anywhere.
+
+### Going forward — secret hygiene checklist
+
+- Never commit a plaintext secret, password, or token to *any* tracked file — including README/RUNBOOK/docs, not just code. Docs get read by the same public that can read the code.
+- Assume this repo is public when deciding what's safe to write down — verify with `curl -s -o /dev/null -w "%{http_code}" https://raw.githubusercontent.com/<org>/<repo>/main/<file>` if unsure (a `200` means anyone can fetch it, no auth required).
+- Use SSH (or a credential helper like `gh auth login`) for git remotes — never a personal access token embedded directly in the remote URL.
+- Reserve `git push --force` for confirmed, deliberate rollback situations only (see [Section 8](#8-deploying-changes)) — never document it as a routine/default deploy step.
