@@ -234,3 +234,23 @@ Fixed in `index.mjs`:
 **To deploy:** paste the updated `index.mjs` into AWS Console → Lambda → `devpack-api` → Code source → Deploy, **and** set the Lambda's `TEAM_TOKEN` environment variable to the new value at the same time the corresponding `index.html` frontend commit goes live — the old hardcoded value and the new one are incompatible, so these two must ship together or requests will 401 in between.
 
 **Residual limitation, for a later fast-follow:** this still relies on one shared token baked into public JS — a determined attacker can still extract whatever token ships next via view-source. The real fix is to verify each user's actual Supabase login session (JWT) server-side per request instead of a shared static secret, since that's individually issued, expiring, and revocable. Not done yet — flagged here so it isn't lost.
+
+**Decision (2026-07-11):** deliberately deferred until after launch — implementing it touches ~10 fetch call sites across `index.html` plus `index.mjs`, with no staging/test Supabase project to validate against, so a bug would break `analyze`/`chat`/`advisor` for every live user simultaneously. Concrete failure modes this leaves open in the meantime:
+- Anyone who extracts the current `TEAM_TOKEN` from page source can call `/analyze`, `/chat`, `/advisor`, `/validate-fix` with a **freshly made-up `user_id`** on every request. Each fake id gets its own 3 free analyses before the per-user Supabase check kicks in (added in this same hardening pass) — so the free-tier cap is real per-identity, but identities themselves are free to mint.
+- Bounded in practice by the mitigations already in place: API Gateway throttling (rate/burst limits), the Anthropic monthly spend cap, and the AWS budget alarm — so worst case is "hits a rate limit / spend cap and gets noticed," not "unbounded bill."
+- Revisit once there's room to test against a real (ideally staging) Supabase project without launch-day time pressure.
+
+### 2026-07-11 — `/lspay` webhook stopgap
+
+`/lspay` (Lemon Squeezy subscription webhook — upgrades a user to `plan: 'pro'`, `analyses_limit: 999999`) had **no verification that the request actually came from Lemon Squeezy**. Anyone could `POST` a fabricated payload with `event_name: 'subscription_created'` and any email and grant that account unlimited free Pro access.
+
+**Stopgap added** (not real signature verification — that requires the Lemon Squeezy webhook signing secret, which needs to be pulled from the LS dashboard and isn't available here): `/lspay` now requires a `?key=<LSPAY_SECRET>` query parameter matching a new `LSPAY_SECRET` Lambda environment variable. Generated value: `a526bd4b1d92b077c717e17193fbe0dd6dbb0813188ceef7`.
+
+**To deploy:**
+1. AWS Console → Lambda → `devpack-api` → Configuration → Environment variables → add `LSPAY_SECRET` = `a526bd4b1d92b077c717e17193fbe0dd6dbb0813188ceef7`
+2. Redeploy the updated `index.mjs` (already includes the check)
+3. Lemon Squeezy dashboard → Settings → Webhooks → edit the webhook URL to `https://sympib3n8l.execute-api.us-east-1.amazonaws.com/lspay?key=a526bd4b1d92b077c717e17193fbe0dd6dbb0813188ceef7`
+
+Until step 3 is done, real Lemon Squeezy webhooks will also get rejected with 401 — do all three together, or Pro upgrades on real purchases will silently stop working.
+
+**Fast-follow:** replace this with real HMAC signature verification against Lemon Squeezy's webhook signing secret (Settings → Webhooks → your webhook → Signing secret) once you have a moment — the stopgap only raises the bar from "trivial" to "must know this URL," it isn't cryptographic.
