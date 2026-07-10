@@ -262,3 +262,16 @@ These credentials were exposed in git history even after the docs were redacted 
 - Assume this repo is public when deciding what's safe to write down — verify with `curl -s -o /dev/null -w "%{http_code}" https://raw.githubusercontent.com/<org>/<repo>/main/<file>` if unsure (a `200` means anyone can fetch it, no auth required).
 - Use SSH (or a credential helper like `gh auth login`) for git remotes — never a personal access token embedded directly in the remote URL.
 - Reserve `git push --force` for confirmed, deliberate rollback situations only (see [Section 8](#8-deploying-changes)) — never document it as a routine/default deploy step.
+
+### 2026-07-11 — Lambda hardening (`index.mjs`)
+
+A deeper look at `index.mjs` (not tracked in this repo — pulled from AWS Lambda for review) found the "team token" check accepted a **hardcoded literal `'CDA-AUTH'` in addition to `TEAM_TOKEN`**, in 5 places (`validate()`, `/userplan`, `/increment`, `/correlate`, `/validate-fix`). That string was also hardcoded in `index.html`'s client JS, so it was visible to anyone who viewed page source — meaning rotating `TEAM_TOKEN` alone would never have closed the hole. Additionally, `/analyze` never checked `analyses_used`/`analyses_limit` server-side (the free-tier cap was UI-only), and the built-in rate limiter keyed on a client-supplied `user_id`, which is trivially spoofable.
+
+Fixed in `index.mjs`:
+- Removed the `'CDA-AUTH'` bypass from all 5 checks — only the real `TEAM_TOKEN` env var value is accepted now.
+- `/analyze` now looks up the caller's plan/usage in Supabase and rejects with 403 if a free-plan user is at or over their limit, instead of trusting the client.
+- The rate limiter now keys on source IP instead of the client-supplied `user_id`.
+
+**To deploy:** paste the updated `index.mjs` into AWS Console → Lambda → `devpack-api` → Code source → Deploy, **and** set the Lambda's `TEAM_TOKEN` environment variable to the new value at the same time the corresponding `index.html` frontend commit goes live — the old hardcoded value and the new one are incompatible, so these two must ship together or requests will 401 in between.
+
+**Residual limitation, for a later fast-follow:** this still relies on one shared token baked into public JS — a determined attacker can still extract whatever token ships next via view-source. The real fix is to verify each user's actual Supabase login session (JWT) server-side per request instead of a shared static secret, since that's individually issued, expiring, and revocable. Not done yet — flagged here so it isn't lost.
