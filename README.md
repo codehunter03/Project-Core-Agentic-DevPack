@@ -11,38 +11,12 @@
 
 ```
 URL      : https://coredumpanalyzer.com
-Password : (ask admin / see team password manager — never stored in this repo)
-API Key  : Each person gets their own at console.anthropic.com (~$5 credits)
-Cost     : ~$0.01 per crash analysis
+Sign in  : Each person creates their own account (email+password or OAuth) — no shared password
+API Key  : Server-managed — Anthropic calls are billed to the project's own account, not the user's
+Cost     : ~$0.01 per crash analysis (paid by the project, see RUNBOOK Security section for spend caps)
 ```
 
----
-
-## 🔑 How to Change the Password
-
-**Step 1** — Generate a SHA-256 hash of your new password:
-```
-https://emn178.github.io/online-tools/sha256.html
-```
-
-**Step 2** — In `index.html` find:
-```javascript
-var HASH = 'e34f5cbf233f274b8602ae750a3ea9a83a0e397b31cf2b9ae911b863a1557cf9';
-```
-Replace with your new hash.
-
-**Step 3** — Also update Lambda environment variable:
-```
-AWS Console → Lambda → devpack-api → Configuration → Environment variables
-TEAM_TOKEN → your-new-token
-```
-
-**Step 4** — Deploy:
-```bash
-git add index.html
-git commit -m "chore: update access password"
-git push
-```
+There used to be a single shared team password gating the whole site (`HASH` check in `index.html`) and a bring-your-own-Anthropic-key model. Both were replaced by real per-user Supabase accounts and a server-managed Anthropic key — see `RUNBOOK.md` Section 6 for the current auth model and Section 10 for how the server-side key is protected.
 
 ---
 

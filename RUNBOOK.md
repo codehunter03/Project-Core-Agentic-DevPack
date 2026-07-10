@@ -11,8 +11,8 @@ Operational reference for admins and team members. For general usage see [README
 3. [Analysis Failures](#3-analysis-failures)
 4. [Rate Limiting](#4-rate-limiting)
 5. [Source File Issues](#5-source-file-issues)
-6. [Password Gate](#6-password-gate)
-7. [Changing the Password](#7-changing-the-password)
+6. [Account Access](#6-account-access-formerly-password-gate)
+7. [(Removed) Changing the Password](#7-removed-changing-the-password)
 8. [Deploying Changes](#8-deploying-changes)
 9. [GitHub Pages Troubleshooting](#9-github-pages-troubleshooting)
 10. [Security Incidents & Credential Hygiene](#10-security-incidents--credential-hygiene)
@@ -119,65 +119,24 @@ The filename is used only for display and for naming the downloaded fixed file. 
 
 ---
 
-## 6. Password Gate
+## 6. Account Access (formerly "Password Gate")
 
-### Forgot the password
-Ask your admin. The password is not stored anywhere recoverable — if it's lost, the admin must rotate it (see [Section 7](#7-changing-the-password)).
+**This section is out of date as of 2026-07 — there is no shared team password anymore.** An earlier version of the product gated access with a single SHA-256-hashed password shared by the whole team (a `var HASH = '...'` check in `index.html`, unlocked via `sessionStorage.setItem('devpack_ok', '1')`). That code no longer exists in `index.html` — access is now per-user via real Supabase accounts (`si-password`/`su-password` sign-in/sign-up fields, email+password or OAuth). Each team member has their own individual login; there is nothing shared to rotate.
 
-### Gate keeps reappearing on every new tab
-The gate uses `sessionStorage`, which is tab-scoped. Opening a new tab requires re-entering the password. This is by design — the session expires when the tab closes.
+### Forgot your password
+Use the in-app "Forgot Password" flow (`doForgotPassword()` — sends a Supabase password reset email to the address on the account). There is no admin-held master password.
 
-### Bypassing the gate (admin only — for testing)
-Open browser DevTools → Console:
-```javascript
-sessionStorage.setItem('devpack_ok', '1'); location.reload();
-```
+### Adding a new team member
+They sign up for their own account via the app's sign-up form. There's no shared credential to hand out.
 
-### The password gate is not real security
-Correct. Anyone who can view the page source can see the SHA-256 hash and bypass the gate via DevTools. The gate is a friction layer only. Do not rely on it to protect sensitive information. The meaningful restriction is the personal Anthropic API key requirement.
+### Revoking someone's access
+Remove/disable their row in the Supabase `users` table (or their Supabase auth user) — there's no shared password to rotate to lock them out.
 
 ---
 
-## 7. Changing the Password
+## 7. (Removed) Changing the Password
 
-### Generate the new hash
-
-**Linux / macOS terminal:**
-```bash
-echo -n "YourNewPassword" | sha256sum
-# copy the 64-character hex string (ignore the trailing " -")
-```
-
-**Windows PowerShell:**
-```powershell
-[System.BitConverter]::ToString(
-  [System.Security.Cryptography.SHA256]::Create().ComputeHash(
-    [System.Text.Encoding]::UTF8.GetBytes("YourNewPassword")
-  )
-).Replace("-","").ToLower()
-```
-
-**Online (no terminal):**
-[emn178.github.io/online-tools/sha256.html](https://emn178.github.io/online-tools/sha256.html) — type the password, copy the result.
-
-### Update the file
-
-In `index.html`, find:
-```javascript
-var HASH = 'e34f5cbf233f274b8602ae750a3ea9a83a0e397b31cf2b9ae911b863a1557cf9';
-```
-
-Replace only the hash string inside the quotes. Do **not** add a `var PASS =` line — the plaintext password must never appear in source.
-
-### Deploy
-
-```bash
-git add index.html
-git commit -m "chore: rotate access password"
-git push
-```
-
-Site updates in ~60 seconds. Communicate the new password to your team out-of-band (Slack DM, 1Password, etc — not in a public channel or commit message).
+This section previously documented rotating the old shared `HASH` password. That mechanism doesn't exist anymore — see [Section 6](#6-account-access-formerly-password-gate). Left as a placeholder so old links to `#7-changing-the-password` don't 404 silently; update any bookmarks.
 
 ---
 
