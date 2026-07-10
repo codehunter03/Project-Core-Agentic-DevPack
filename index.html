@@ -1282,7 +1282,7 @@ async function onAuthSuccess(user) {
   if (gate) { gate.className = 'hidden'; gate.style.display = 'none'; }
 
   // Set team token for Lambda
-  localStorage.setItem('devpack_team_token', 'CDA-AUTH');
+  localStorage.setItem('devpack_team_token', '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1');
 
   // Update header badge (creates pill element)
   updateUserBadge(user.email);
@@ -1310,7 +1310,7 @@ async function loadUserPlan(userId) {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/userplan', {
       method: 'POST',
-      body: JSON.stringify({ user_id: userId, email: currentUser?.email || '', team_token: 'CDA-AUTH' })
+      body: JSON.stringify({ user_id: userId, email: currentUser?.email || '', team_token: '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1' })
     });
     if (resp.ok) {
       var d = await resp.json();
@@ -1534,7 +1534,7 @@ async function incrementUsage() {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/increment', {
       method: 'POST',
-      body: JSON.stringify({ user_id: currentUser.id, team_token: 'CDA-AUTH' })
+      body: JSON.stringify({ user_id: currentUser.id, team_token: '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1' })
     });
     if (resp.ok) {
       var d = await resp.json();
@@ -3106,7 +3106,7 @@ async function runAnalysis() {
     var lastRaw  = '';
     var maxRetries = 3;
     var LAMBDA   = 'https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze';
-    var teamTok  = 'CDA-AUTH';
+    var teamTok  = '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1';
 
     // Single call with smart model selection — Lambda handles retries internally
     lg('🤖 Analyzing with AI (this may take 20-40s for complex crashes)...', 'info');
@@ -3144,7 +3144,7 @@ async function runAnalysis() {
           method:  'POST',
           signal:  controller.signal,
           body: JSON.stringify({
-            team_token:      'CDA-AUTH',
+            team_token:      '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1',
             user_id:         currentUser ? currentUser.id : 'anon',
             backtrace:       btSend,
             source:          src.length > 3000 ? src.slice(0, 3000) + '\n...[truncated]' : src,
@@ -3368,7 +3368,7 @@ async function sendFollowup() {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/chat', {
       method: 'POST',
-      body: JSON.stringify({ messages: chatHistory, team_token: 'CDA-AUTH' })
+      body: JSON.stringify({ messages: chatHistory, team_token: '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1' })
     });
 
     if (!resp.ok) {
@@ -3435,7 +3435,7 @@ document.getElementById('bt').addEventListener('input', function() {
   // Debounce: wait 1s after user stops typing/pasting
   advisorDebounce = setTimeout(function() {
     var apiKey    = 'server-managed';
-    var teamToken = 'CDA-AUTH';
+    var teamToken = '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1';
 
     if (!apiKey) {
       if (typing) typing.classList.remove('show');
@@ -3543,7 +3543,7 @@ async function runAdvisor() {
   var rerunBtn  = document.getElementById('advisor-rerun-btn');
 
   if (!bt || bt.length < 20) return;
-  var teamToken = 'CDA-AUTH';
+  var teamToken = '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1';
   if (!teamToken) return; // Not logged in yet
 
   // Show scanning state
@@ -3557,7 +3557,7 @@ async function runAdvisor() {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/advisor', {
       method: 'POST',
-      body: JSON.stringify({ backtrace: bt, team_token: 'CDA-AUTH' })
+      body: JSON.stringify({ backtrace: bt, team_token: '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1' })
     });
 
     if (!resp.ok) {
@@ -3816,7 +3816,7 @@ async function runSelfTest() {
     var accResp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/analyze', {
       method: 'POST',
       body: JSON.stringify({
-        team_token: 'CDA-AUTH',
+        team_token: '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1',
         backtrace:  ST_BACKTRACE,
         source:     ST_SOURCE,
         filename:   'processor.c',
@@ -3986,7 +3986,7 @@ async function runFixValidation() {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/validate-fix', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Team-Token': 'CDA-AUTH' },
+      headers: { 'Content-Type': 'application/json', 'X-Team-Token': '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1' },
       body: JSON.stringify({
         root_cause:     rootCause,
         bug_category:   bugCategory,
@@ -4065,7 +4065,7 @@ async function loadCorrelations() {
   try {
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/correlate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Team-Token': 'CDA-AUTH' },
+      headers: { 'Content-Type': 'application/json', 'X-Team-Token': '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1' },
       body: JSON.stringify({
         bug_category: bugCat,
         signal:       curResult.signal || '',
@@ -4446,7 +4446,7 @@ async function sendFeedback(worked) {
   if (status) status.textContent = 'Saving...';
 
   try {
-    var teamToken = 'CDA-AUTH';
+    var teamToken = '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1';
     var apiKey    = 'server-managed'    || '';
 
     var payload = {
@@ -4456,7 +4456,7 @@ async function sendFeedback(worked) {
 
     var resp = await fetch('https://sympib3n8l.execute-api.us-east-1.amazonaws.com/feedback', {
       method: 'POST',
-      body: JSON.stringify({ ...payload, team_token: 'CDA-AUTH' }),
+      body: JSON.stringify({ ...payload, team_token: '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1' }),
     });
 
     if (status) {
