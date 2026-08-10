@@ -1181,13 +1181,11 @@ initSupabase();
 // ════════════════════════════════════════════════════════════
 // FEATURE: AUTH — surface OAuth return failures instead of failing silently
 // ════════════════════════════════════════════════════════════
-// The PKCE flow (flowType:'pkce' above) needs a code_verifier that Supabase
-// stashed in localStorage on the SAME browser that started the Google
-// sign-in. If the callback lands in a different browser context — a fresh
-// incognito/private window, a different device, storage cleared between
-// legs of the redirect — that verifier is missing and the code exchange
-// fails with no visible error, silently dumping the user back on the
-// sign-in screen even though Google auth itself succeeded. Detect that
+// Supabase's OAuth/email-confirmation redirects can fail upstream (e.g. the
+// requested redirectTo isn't in the Supabase project's Redirect URLs
+// allowlist) and bounce back to a bare URL with no token, no code, and no
+// error param — with no visible error, silently dumping the user back on
+// the sign-in screen even though Google auth itself succeeded. Detect that
 // case and tell the user what happened instead of leaving them confused.
 (function() {
   var params = new URLSearchParams(window.location.search);
@@ -1273,7 +1271,7 @@ async function signInWithGoogle() {
   const { error } = await supa.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: 'https://coredumpanalyzer.com',
+      redirectTo: window.location.origin,
       queryParams: {
         prompt: 'select_account',  // Always show account picker
         access_type: 'offline',
