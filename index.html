@@ -1066,9 +1066,14 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 // ── Pre-check: show landing by default, spinner only when session exists ─────
 (function() {
   try {
-    var hash = window.location.hash || '';
-    // Returning from OAuth — show spinner
-    if (hash.includes('access_token') || hash.includes('error_description')) {
+    var hash   = window.location.hash   || '';
+    var search = window.location.search || '';
+    // Returning from OAuth — show spinner.
+    // Covers both the old implicit flow (#access_token in the hash) and the
+    // PKCE flow this app actually uses (?code=... in the query string) —
+    // without this, PKCE returns fell through to the plain landing page.
+    if (hash.includes('access_token') || hash.includes('error_description') ||
+        search.includes('code=') || search.includes('error=') || search.includes('error_description')) {
       document.addEventListener('DOMContentLoaded', function() {
         var g = document.getElementById('gate');
         if (g) g.className = 'checking';
@@ -1166,6 +1171,55 @@ async function initSupabase() {
   // onAuthStateChange fires INITIAL_SESSION automatically — no need to call getSession separately
 }
 initSupabase();
+
+// ════════════════════════════════════════════════════════════
+// FEATURE: AUTH — surface OAuth return failures instead of failing silently
+// ════════════════════════════════════════════════════════════
+// The PKCE flow (flowType:'pkce' above) needs a code_verifier that Supabase
+// stashed in localStorage on the SAME browser that started the Google
+// sign-in. If the callback lands in a different browser context — a fresh
+// incognito/private window, a different device, storage cleared between
+// legs of the redirect — that verifier is missing and the code exchange
+// fails with no visible error, silently dumping the user back on the
+// sign-in screen even though Google auth itself succeeded. Detect that
+// case and tell the user what happened instead of leaving them confused.
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+  var oauthError = params.get('error_description') || params.get('error') ||
+                    hashParams.get('error_description') || hashParams.get('error');
+  var hasCode = params.has('code');
+  if (!oauthError && !hasCode) return;
+
+  var cleanUrl = function() {
+    try { history.replaceState(null, '', window.location.pathname); } catch(e) {}
+  };
+  var showAuthFailure = function(msg) {
+    var g = document.getElementById('gate');
+    if (g) { g.className = ''; g.style.display = ''; }
+    if (typeof showSignIn === 'function') showSignIn();
+    if (typeof showView === 'function') showView('signin');
+    if (typeof setAuthMsg === 'function') setAuthMsg(msg, 'err');
+    cleanUrl();
+  };
+
+  if (oauthError) {
+    document.addEventListener('DOMContentLoaded', function() {
+      showAuthFailure('Google sign-in failed: ' + oauthError);
+    });
+    return;
+  }
+
+  // hasCode — give Supabase's detectSessionInUrl a chance to exchange it
+  // for a session; if it hasn't by the time this fires, it isn't going to.
+  setTimeout(function() {
+    if (!currentUser) {
+      showAuthFailure('Sign-in could not be completed in this browser — this can happen in incognito/private windows or when the sign-in link is opened on a different device than where you started. Please click "Continue with Google" again here.');
+    } else {
+      cleanUrl();
+    }
+  }, 6000);
+})();
 
 // Current user state
 var currentUser     = null;
