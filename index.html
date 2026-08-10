@@ -1123,7 +1123,13 @@ async function initSupabase() {
       detectSessionInUrl: true,
       storageKey:         SESSION_KEY,
       storage:            window.localStorage,
-      flowType:           'pkce',
+      // 'implicit' (not 'pkce') — PKCE needs a code_verifier stashed in the
+      // SAME browser that started the flow, so it breaks on new devices:
+      // Google OAuth on a fresh browser, and email-confirmation links
+      // (opened from a mail app, not the signup browser). Implicit flow
+      // returns tokens directly in the URL fragment, no stored secret
+      // needed, so it completes on any device.
+      flowType:           'implicit',
     }
   });
 
