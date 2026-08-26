@@ -1187,7 +1187,25 @@ async function initSupabase() {
     }
   });
 
-  // onAuthStateChange fires INITIAL_SESSION automatically — no need to call getSession separately
+  // ── Definitive session check — does NOT rely on event timing ──────────────
+  // onAuthStateChange can fire INITIAL_SESSION with null BEFORE Supabase reads
+  // the stored session or parses the OAuth URL. That intermittently bounces a
+  // logged-in user back to the landing page. This explicit getSession() call
+  // is the source of truth: if a valid session exists, load the tool directly.
+  try {
+    var sres = await supa.auth.getSession();
+    var ssession = sres && sres.data && sres.data.session;
+    if (ssession && ssession.user) {
+      var lastActive = parseInt(localStorage.getItem(LAST_ACTIVE_KEY) || '0');
+      var timedOut = false;
+      if (lastActive > 0 && (Date.now() - lastActive) >= TIMEOUT_MS) timedOut = true;
+      if (!timedOut) {
+        var g = document.getElementById('gate');
+        if (g) { g.className = 'hidden'; g.style.display = 'none'; }
+        if (!currentUser) { await onAuthSuccess(ssession.user); }
+      }
+    }
+  } catch(e) {}
 }
 initSupabase();
 
