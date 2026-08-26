@@ -1138,6 +1138,19 @@ async function initSupabase() {
     console.log('[CDA] Auth event:', event);
 
     if (event === 'SIGNED_OUT' || (!session && event === 'INITIAL_SESSION')) {
+      // If we're mid-OAuth-redirect (hash/query still has the token or code),
+      // Supabase may fire INITIAL_SESSION with null BEFORE it finishes parsing
+      // the URL. Do NOT flash the landing page — keep the spinner and wait for
+      // the SIGNED_IN event that follows. Otherwise logged-in users get bounced
+      // back to the landing page.
+      var _h = window.location.hash || '';
+      var _s = window.location.search || '';
+      var midOAuth = _h.includes('access_token') || _s.includes('code=');
+      if (midOAuth && event === 'INITIAL_SESSION') {
+        var gc = document.getElementById('gate');
+        if (gc) gc.className = 'checking';
+        return;
+      }
       currentUser = null;
       var g = document.getElementById('gate');
       if (g) { g.className = ''; g.style.display = ''; }
@@ -1214,15 +1227,37 @@ initSupabase();
     return;
   }
 
-  // hasCode — give Supabase's detectSessionInUrl a chance to exchange it
-  // for a session; if it hasn't by the time this fires, it isn't going to.
-  setTimeout(function() {
-    if (!currentUser) {
-      showAuthFailure('Sign-in could not be completed in this browser — this can happen in incognito/private windows or when the sign-in link is opened on a different device than where you started. Please click "Continue with Google" again here.');
-    } else {
-      cleanUrl();
+  // hasCode / OAuth return — give Supabase's detectSessionInUrl a chance to
+  // exchange it for a session. Poll getSession() a few times to recover the
+  // session even if the onAuthStateChange event timing was missed, BEFORE
+  // giving up and showing a failure message.
+  var oauthTries = 0;
+  var oauthPoll = setInterval(async function() {
+    oauthTries++;
+    if (currentUser) { clearInterval(oauthPoll); cleanUrl(); return; }
+    try {
+      if (window.supa) {
+        var res = await window.supa.auth.getSession();
+        var sess = res && res.data && res.data.session;
+        if (sess && sess.user) {
+          clearInterval(oauthPoll);
+          var g = document.getElementById('gate');
+          if (g) { g.className = 'hidden'; g.style.display = 'none'; }
+          if (!currentUser) { await onAuthSuccess(sess.user); }
+          cleanUrl();
+          return;
+        }
+      }
+    } catch(e) {}
+    if (oauthTries >= 8) {   // ~8 seconds total
+      clearInterval(oauthPoll);
+      if (!currentUser) {
+        showAuthFailure('Sign-in could not be completed in this browser — this can happen in incognito/private windows or when the sign-in link is opened on a different device than where you started. Please click "Continue with Google" again here.');
+      } else {
+        cleanUrl();
+      }
     }
-  }, 6000);
+  }, 1000);
 })();
 
 // Current user state
