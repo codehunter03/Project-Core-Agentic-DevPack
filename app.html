@@ -338,6 +338,14 @@ textarea:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(
 .pbar.live{background:rgba(240,138,93,.5);animation:glow 1s infinite}
 @keyframes glow{0%,100%{opacity:.4}50%{opacity:1}}
 .prog-lbl{font-size:.68rem;color:var(--t2)}
+.ai-stages{display:flex;gap:3px;font-size:.58rem;color:var(--t3);letter-spacing:.3px}
+.ai-stages span{flex:1;text-align:center;transition:color .3s}
+.ai-stages span.done{color:var(--t2)}
+.ai-stages span.live{color:var(--blue);font-weight:700}
+.ai-chip{display:inline-flex;align-items:center;gap:6px;font-size:.62rem;letter-spacing:.4px;
+  color:var(--blue);border:1px solid rgba(240,138,93,.35);background:rgba(226,106,58,.08);
+  padding:3px 10px;border-radius:999px}
+.ai-chip i{width:6px;height:6px;border-radius:50%;background:var(--blue);box-shadow:0 0 8px var(--blue);font-style:normal}
 .dots{display:flex;gap:4px;justify-content:center;padding:.6rem}
 .dot{
   width:6px;height:6px;border-radius:50%;
@@ -2261,6 +2269,9 @@ void causeCrash() {
         <div class="pbar" id="pb2"></div><div class="pbar" id="pb3"></div>
         <div class="pbar" id="pb4"></div>
       </div>
+      <div class="ai-stages" id="ai-stages">
+        <span>parse</span><span>map</span><span>🧠 claude</span><span>validate</span><span>fix</span>
+      </div>
       <div class="prog-lbl" id="plbl">Initializing...</div>
       <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
     </div>
@@ -2284,6 +2295,7 @@ void causeCrash() {
     <div class="empty" id="empty">
       <div class="empty-glyph">🔬</div>
       <div class="empty-h">Ready to Analyze Core Dumps</div>
+      <div class="ai-chip" style="margin:.2rem auto .9rem"><i></i>Claude by Anthropic · 3 AI agents</div>
       <div class="empty-steps">
         <div>① Paste your GDB backtrace (must contain at least #0)</div>
         <div>② Upload or paste the relevant source file</div>
@@ -2509,7 +2521,7 @@ void causeCrash() {
 // ══════════════════════════════════════════════
 //  CONSTANTS
 // ══════════════════════════════════════════════
-const STEPS = ['Parse Backtrace','Map Source','AI Analysis','Generate Diff','Complete'];
+const STEPS = ['Parsing crash signal','Mapping source frames','Claude AI reasoning','Validating structured output','Building fix & diff'];
 const SEV = {
   Critical:{bg:'rgba(218,54,51,.12)',bdr:'#da3633',tx:'#ff6b6b'},
   High:    {bg:'rgba(227,179,65,.1)', bdr:'#e3b341',tx:'#e3b341'},
@@ -2609,6 +2621,10 @@ function setStep(n) {
     } else {
       b.className = 'pbar'+(i<n?' done':i===n?' live':'');
     }
+  }
+  var stages = document.querySelectorAll('#ai-stages span');
+  for (var j = 0; j < stages.length; j++) {
+    stages[j].className = n >= total || j < n ? 'done' : j === n ? 'live' : '';
   }
   var lbl = document.getElementById('plbl');
   if (lbl) lbl.textContent = n >= total ? 'Complete' : (STEPS[Math.min(n,4)]||'Complete');
@@ -2960,6 +2976,7 @@ function renderResult(r) {
     </span>
     ${r.faulting_function?`<span class="pill" style="color:#d2a8ff;border-color:#d2a8ff;background:transparent">fn: ${r.faulting_function}</span>`:''}
     ${r.faulting_line?`<span class="pill" style="color:#f08a5d;border-color:#f08a5d;background:transparent">line: ${r.faulting_line}</span>`:''}
+    ${r.model_label?`<span class="ai-chip" title="Model that produced this root-cause analysis"><i></i>${esc(r.model_label)}</span>`:''}
   `;
   // ── Confidence evidence breakdown ──
   (function() {
@@ -3174,7 +3191,7 @@ async function runAnalysis() {
   try {
     lg('Parsing crash signal and backtrace...'); setStep(0); await sleep(200);
     lg('Mapping crash location to source file...'); setStep(1); await sleep(200);
-    lg('Sending to AI for root cause analysis (15-30s)...'); setStep(2);
+    lg('🧠 Sending to Claude for root cause analysis over your backtrace + source (15-30s)...'); setStep(2);
 
     // ── Pre-process backtrace to extract key signals ──
     const btLines = bt.split('\n');
@@ -3206,7 +3223,7 @@ async function runAnalysis() {
     var teamTok  = '38b8ce51fad77e774cfe16b687454328650f137ecd314cd45af7f9fb9431d8b1';
 
     // Single call with smart model selection — Lambda handles retries internally
-    lg('🤖 Analyzing with AI (this may take 20-40s for complex crashes)...', 'info');
+    lg('🤖 Agent pipeline: Evidence RCA → Fix Validation → Correlation (Claude by Anthropic)', 'info');
 
     // Detect complexity to choose model upfront
     var isComplex = bt.length > 3000 || src.length > 6000;
@@ -3275,7 +3292,7 @@ async function runAnalysis() {
       if (resp.status === 401) throw new Error('Session expired — please sign out and sign in again.');
       if (resp.status === 429) throw new Error('Too many requests — please wait 30 seconds and retry.');
       if (resp.status === 503 || resp.status === 504 || errMsg.includes('fetch') || errMsg.includes('supabase')) {
-        throw new Error('Analysis timed out. Please set API Gateway timeout to 29000ms in AWS Console, or try with a shorter backtrace.');
+        throw new Error('Analysis timed out — please retry, or trim the backtrace to the crashing thread.');
       } else {
         throw new Error('Analysis error — please try again.');
       }
@@ -3306,7 +3323,9 @@ async function runAnalysis() {
     }
 
     lg('Parsing AI response...'); setStep(3); await sleep(200);
-    curResult = Object.assign({}, parsed, { originalSource: src, fileName: curFname });
+    curResult = Object.assign({}, parsed, { originalSource: src, fileName: curFname,
+                              model_label: respData.model_label || '' });
+    if (respData.model_label) lg('🧠 Reasoned by ' + respData.model_label + (respData.elapsed_ms ? ' in ' + (respData.elapsed_ms/1000).toFixed(1) + 's' : ''), 'ok');
 
     lg('Generating diff...'); await sleep(200); setStep(4);
     var elapsed = Math.round((Date.now() - analysisStart) / 1000);

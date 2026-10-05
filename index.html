@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CoreDumpAnalyzer — you crashed. now understand it.</title>
-<meta name="description" content="An AI engine that turns a GDB core dump into root cause, a working fix, and a JIRA-ready RCA doc. In under 30 seconds.">
+<meta name="description" content="An agentic AI engine built on Claude that turns a GDB core dump into root cause, a working fix, and a JIRA-ready RCA doc. In under 30 seconds.">
 <meta name="theme-color" content="#e26a3a">
 <meta property="og:title" content="CoreDumpAnalyzer — you crashed. now understand it.">
 <meta property="og:description" content="Paste a backtrace. Get root cause, a working fix, and an RCA doc. In under 30 seconds.">
@@ -143,6 +143,52 @@ h2.sec-h .it{font-weight:500}
 .band- cta{margin-top:26px}
 .band .btn-primary{margin-top:28px}
 
+/* ── the AI stack (always-dark console band) ── */
+.ai-sec{background:#141210;color:#f2ece1;position:relative;overflow:hidden;border-block:1px solid #2e2920}
+.ai-sec::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(600px 320px at 85% 0%,rgba(226,106,58,.22),transparent 70%),
+  radial-gradient(1px 1px at 1px 1px,#2e2920 1px,transparent 0) 0 0/22px 22px;pointer-events:none}
+.ai-sec .wrap{position:relative}
+.ai-sec h2.sec-h{color:#f2ece1}
+.ai-sec .sec-lead{color:#c8bfb0}
+.ai-sec .sec-lead b{color:#f2ece1;font-weight:600}
+.model-pill{display:inline-flex;align-items:center;gap:10px;margin:6px 0 26px;font-family:'JetBrains Mono',monospace;font-size:13px;
+  border:1px solid rgba(226,106,58,.45);background:rgba(226,106,58,.1);color:#f4b08f;padding:7px 14px;border-radius:999px}
+.model-pill i{width:8px;height:8px;border-radius:50%;background:var(--ember);box-shadow:0 0 0 0 rgba(226,106,58,.6);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(226,106,58,.55)}70%{box-shadow:0 0 0 10px rgba(226,106,58,0)}100%{box-shadow:0 0 0 0 rgba(226,106,58,0)}}
+.ai-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:28px;margin-top:40px;align-items:start}
+@media(max-width:880px){.ai-grid{grid-template-columns:1fr}}
+.pipe{list-style:none;position:relative;display:flex;flex-direction:column;gap:12px}
+.pipe::before{content:"";position:absolute;left:21px;top:22px;bottom:22px;width:2px;background:linear-gradient(#e26a3a,rgba(226,106,58,.15))}
+.pipe li{position:relative;display:grid;grid-template-columns:44px 1fr;gap:14px;align-items:start;
+  background:#1b1813;border:1px solid #2e2920;border-radius:14px;padding:14px 16px 14px 10px;transition:border-color .2s,transform .2s}
+.pipe li:hover{border-color:rgba(226,106,58,.55);transform:translateX(3px)}
+.pipe .n{width:24px;height:24px;margin:2px 0 0 8px;border-radius:50%;background:#141210;border:2px solid var(--ember);
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;color:#f4b08f;display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
+.pipe li.core{border-color:rgba(226,106,58,.6);background:linear-gradient(135deg,rgba(226,106,58,.16),#1b1813 60%)}
+.pipe li.core .n{background:var(--ember);color:#fff}
+.pipe h3{font-family:'Fraunces',serif;font-weight:600;font-size:18.5px;letter-spacing:-.2px;color:#f2ece1;margin-bottom:3px}
+.pipe p{font-size:14px;color:#b3a999;line-height:1.5}
+.pipe .tag{display:inline-block;margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#f4b08f;border:1px solid rgba(226,106,58,.35);padding:2px 9px;border-radius:999px}
+.trace{background:#0f0c09;border:1px solid #2e2920;border-radius:16px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(0,0,0,.8);position:sticky;top:84px}
+.trace-bar{display:flex;align-items:center;gap:7px;padding:12px 14px;border-bottom:1px solid #2e2920;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8a8073}
+.trace-bar b{width:10px;height:10px;border-radius:50%;background:#3a342b}
+.trace-bar b:first-child{background:#e26a3a}
+.trace-bar span{margin-left:8px}
+.trace-body{overflow-x:auto;padding:16px 18px 18px}
+.trace pre{font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.85;color:#c8bfb0;white-space:pre}
+.trace .l{display:block;opacity:0;transform:translateY(4px);transition:opacity .35s ease,transform .35s ease}
+.trace.in .l{opacity:1;transform:none}
+.trace .k{color:#f4b08f}.trace .g{color:#7fb886}.trace .m{color:#8a8073}.trace .w{color:#f2ece1}
+.trace .cursor{display:inline-block;width:8px;height:15px;background:var(--ember);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.guards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px}
+@media(max-width:760px){.guards{grid-template-columns:1fr}}
+.guard{border-top:2px solid var(--ember);padding-top:14px}
+.guard h4{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:#f2ece1;text-transform:lowercase;letter-spacing:.3px;margin-bottom:6px}
+.guard p{font-size:14px;color:#b3a999;line-height:1.5}
+@media(prefers-reduced-motion:reduce){.trace .l{opacity:1;transform:none;transition:none}.model-pill i,.trace .cursor{animation:none}}
+
 /* ── example cards grid ── */
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-top:44px}
 @media(max-width:720px){.grid{grid-template-columns:1fr}}
@@ -197,6 +243,7 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--ink3);fo
     <a href="#top" class="brand"><span class="mk">&gt;_</span> CoreDumpAnalyzer</a>
     <nav class="nav-links">
       <a href="#how" class="hide-sm">how it works</a>
+      <a href="#ai" class="hide-sm">ai stack</a>
       <a href="#examples" class="hide-sm">examples</a>
       <a href="#agents" class="hide-sm">agents</a>
       <a class="nav-cta" href="/app.html?auth=signin">open the app</a>
@@ -209,9 +256,9 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--ink3);fo
 <!-- ───────── HERO ───────── -->
 <div class="hero">
   <div class="wrap">
-    <div class="eyebrow">production ai crash analysis</div>
+    <div class="eyebrow">ai crash analysis · powered by claude</div>
     <h1 class="hero-h">you crashed.<br><span class="it em">now understand it.</span></h1>
-    <p class="hero-sub">An AI engine that turns a raw GDB core dump into <strong>root cause</strong>, a <strong>working fix</strong>, and a <strong>JIRA-ready RCA doc</strong>. One backtrace in. Answers out. In under 30 seconds.</p>
+    <p class="hero-sub">An agentic AI engine, built on Claude, that turns a raw GDB core dump into <strong>root cause</strong>, a <strong>working fix</strong>, and a <strong>JIRA-ready RCA doc</strong>. One backtrace in. Answers out. In under 30 seconds.</p>
     <div class="hero-ctas">
       <a class="btn-primary" href="/app.html?auth=signup">Analyze a core dump →</a>
       <a class="btn-ghost" href="#demo">▶ watch the demo</a>
@@ -236,6 +283,37 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--ink3);fo
       <h2 class="sec-h">we read the <span class="it em">actual crash.</span></h2>
       <p class="sec-lead">Paste a GDB backtrace. The engine finds the faulting frame, asks for only the source files it genuinely needs, then returns the root cause, the exact buggy line, and a corrected fix — with its reasoning shown, not hidden.</p>
       <a class="btn-primary" href="/app.html?auth=signup">Start free — 3 analyses →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── THE AI STACK ───────── -->
+<section id="ai" class="ai-sec">
+  <div class="wrap">
+    <div class="sec-label">the ai under the hood</div>
+    <h2 class="sec-h">an agent pipeline,<br><span class="it em">not a chatbot.</span></h2>
+    <div class="model-pill"><i></i>powered by Claude, by Anthropic</div>
+    <p class="sec-lead">Every backtrace runs through an orchestrated pipeline built on <b>Claude</b>, Anthropic's AI model. Each stage has one job and returns structured output, and each result is checked before the next stage runs.</p>
+
+    <div class="ai-grid">
+      <ol class="pipe reveal">
+        <li><span class="n">01</span><div><h3>Triage</h3><p>Parses the signal, frames, threads and language straight from the GDB output — no model guesswork for what the stack already says.</p><span class="tag">deterministic</span></div></li>
+        <li><span class="n">02</span><div><h3>File Advisor agent</h3><p>Reads the backtrace and asks for only the source files the crash actually touches, so the model sees signal, not your whole repo.</p><span class="tag">context selection</span></div></li>
+        <li class="core"><span class="n">03</span><div><h3>Root-cause reasoning</h3><p>Claude reasons over the frames and source, then returns schema-checked JSON: the buggy line, a corrected line, confidence, and what evidence is still missing.</p><span class="tag">claude · structured reasoning</span></div></li>
+        <li><span class="n">04</span><div><h3>Fix Validation agent</h3><p>Reviews the proposed fix like a senior engineer — races, ownership, regressions — before you ever apply it.</p><span class="tag">safe · caution · unsafe</span></div></li>
+        <li><span class="n">05</span><div><h3>Correlation engine</h3><p>Matches the crash against your team's history. Fixes engineers confirmed rank first; disputed ones are penalised.</p><span class="tag">team memory</span></div></li>
+      </ol>
+
+      <div class="trace reveal" id="trace" aria-label="Example agent trace">
+        <div class="trace-bar"><b></b><b></b><b></b><span>agent trace · core.8812</span></div>
+        <div class="trace-body"><pre><span class="l" style="transition-delay:0.00s"><span class="m">$</span> <span class="w">cda investigate core.8812</span></span><span class="l" style="transition-delay:0.32s"><span class="k">▸ triage    </span> SIGABRT · double free · C++ · thread 1</span><span class="l" style="transition-delay:0.64s"><span class="k">▸ advisor   </span> needs queue.cpp, worker.cpp <span class="m">(2 of 41 files)</span></span><span class="l" style="transition-delay:0.96s"><span class="k">▸ claude    </span> reasoning over 6 frames + 2 files<span class="m">…</span></span><span class="l" style="transition-delay:1.28s"><span class="k">▸ root cause</span> consumer():47 double-frees a Job</span><span class="l" style="transition-delay:1.60s"><span class="k">▸ fix       </span> std::unique_ptr&lt;Job&gt;, hand-off via std::move</span><span class="l" style="transition-delay:1.92s"><span class="k">▸ validate  </span> <span class="g">SAFE</span> · regression risk Low</span><span class="l" style="transition-delay:2.24s"><span class="k">▸ correlate </span> 2 similar crashes · 1 verified fix</span><span class="l" style="transition-delay:2.56s"><span class="g">✔</span> <span class="w">root cause + fix + rca.md</span> <span class="m">· 18.4s</span> <span class="cursor"></span></span></pre></div>
+      </div>
+    </div>
+
+    <div class="guards">
+      <div class="guard"><h4>verified ≠ inferred</h4><p>Findings read straight off the stack are labelled separately from the model's conclusions, with a confidence and its rationale.</p></div>
+      <div class="guard"><h4>structured, not freeform</h4><p>Every stage answers in a fixed JSON shape that the app validates before it shows you anything.</p></div>
+      <div class="guard"><h4>context on a budget</h4><p>The File Advisor sends only the frames and files that matter, so analysis stays fast and your codebase never leaves in bulk.</p></div>
     </div>
   </div>
 </section>
@@ -285,7 +363,7 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--ink3);fo
   <div class="wrap">
     <div class="sec-label">three agents, one investigation</div>
     <h2 class="sec-h">it doesn't just analyze — <span class="it em">it reasons.</span></h2>
-    <p class="sec-lead">Every analysis runs through three specialised agents that separate what's proven from what's inferred.</p>
+    <p class="sec-lead">Every analysis runs through three specialised Claude-powered agents that separate what's proven from what's inferred.</p>
 
     <div class="agents reveal">
       <div class="agent">
