@@ -11,6 +11,9 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://coredumpanalyzer.com/">
 <link rel="canonical" href="https://coredumpanalyzer.com/">
+<meta property="og:image" content="https://coredumpanalyzer.com/assets/demo-poster.jpg">
+<meta property="og:video" content="https://coredumpanalyzer.com/assets/demo.mp4">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23141210'/><text y='64' x='12' font-size='44' font-family='monospace' fill='%23e26a3a' font-weight='bold'>&gt;_</text></svg>">
 <script>
 // Auth hand-off: Supabase OAuth / email-confirm / password-reset redirects and
@@ -108,7 +111,7 @@ h1.hero-h .it{font-weight:600}
 
 /* ── hero video ── */
 .hero-media{margin-top:52px;position:relative}
-.video-frame{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--card);box-shadow:0 30px 70px -30px rgba(40,30,20,.4);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.video-frame{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--card);box-shadow:0 30px 70px -30px rgba(40,30,20,.4);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;}
 /* ── video placeholder (swap this block for a real <video>) ── */
 .vid-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
   background:
@@ -211,33 +214,15 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--ink3);fo
     <p class="hero-sub">An AI engine that turns a raw GDB core dump into <strong>root cause</strong>, a <strong>working fix</strong>, and a <strong>JIRA-ready RCA doc</strong>. One backtrace in. Answers out. In under 30 seconds.</p>
     <div class="hero-ctas">
       <a class="btn-primary" href="/app.html?auth=signup">Analyze a core dump →</a>
-      <a class="btn-ghost" href="#demo">▶ watch the 30-second demo</a>
+      <a class="btn-ghost" href="#demo">▶ watch the demo</a>
     </div>
 
     <!-- HERO VIDEO -->
     <div class="hero-media reveal" id="demo">
-      <div class="video-frame" id="videoFrame" role="button" tabindex="0" aria-label="Play demo video">
-        <!--
-          ╔══════════════════════════════════════════════════════════════╗
-          ║  SWAP THIS PLACEHOLDER FOR YOUR REAL VIDEO WHEN READY:          ║
-          ║                                                                ║
-          ║  Direct .mp4 →                                                 ║
-          ║  <video src="YOUR_VIDEO.mp4" controls playsinline              ║
-          ║         poster="YOUR_THUMB.jpg"                                ║
-          ║         style="width:100%;height:100%;object-fit:cover"></video>║
-          ║                                                                ║
-          ║  YouTube →                                                     ║
-          ║  <iframe src="https://www.youtube.com/embed/VIDEO_ID"          ║
-          ║    style="width:100%;height:100%;border:0" allowfullscreen>    ║
-          ║  </iframe>                                                      ║
-          ╚══════════════════════════════════════════════════════════════╝
-        -->
-        <div class="vid-placeholder">
-          <div class="play-ring"></div>
-          <div class="vid-note"><b>demo video goes here</b><br>drop in your clip when you're back at a laptop</div>
-        </div>
-        <span class="tap-sound">tap for sound</span>
-        <span class="dur-badge">0:30</span>
+      <div class="video-frame" id="videoFrame">
+        <video src="/assets/demo.mp4" poster="/assets/demo-poster.jpg" controls playsinline preload="none"
+               aria-label="CoreDumpAnalyzer demo video"
+               style="width:100%;height:100%;display:block;object-fit:contain;background:#000"></video>
       </div>
     </div>
   </div>
@@ -363,15 +348,6 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--ink3);fo
     entries.forEach(function(en){if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target);}});
   },{threshold:.12});
   els.forEach(function(e){io.observe(e)});
-})();
-
-// placeholder click → nudge to swap in a real video (harmless until then)
-(function(){
-  var f=document.getElementById('videoFrame');
-  if(!f) return;
-  function go(){ window.location.href='/app.html?auth=signup'; }
-  f.addEventListener('click',go);
-  f.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});
 })();
 </script>
 </body>
