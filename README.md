@@ -3,7 +3,7 @@
 
 > AI-powered tool that analyzes GDB core dumps, identifies root causes, and generates complete fixes automatically.
 
-**Live:** https://coredumpanalyzer.com
+**Live:** https://coredumpanalyzer.com (landing) · https://coredumpanalyzer.com/app.html (app)
 
 ---
 
@@ -16,7 +16,7 @@ API Key  : Server-managed — Anthropic calls are billed to the project's own ac
 Cost     : ~$0.01 per crash analysis (paid by the project, see RUNBOOK Security section for spend caps)
 ```
 
-There used to be a single shared team password gating the whole site (`HASH` check in `index.html`) and a bring-your-own-Anthropic-key model. Both were replaced by real per-user Supabase accounts and a server-managed Anthropic key — see `RUNBOOK.md` Section 6 for the current auth model and Section 10 for how the server-side key is protected.
+There used to be a single shared team password gating the whole site (`HASH` check in the app page, now `app.html`) and a bring-your-own-Anthropic-key model. Both were replaced by real per-user Supabase accounts and a server-managed Anthropic key — see `RUNBOOK.md` Section 6 for the current auth model and Section 10 for how the server-side key is protected.
 
 ---
 
@@ -131,8 +131,8 @@ python main.py \
 ## 🔄 Deploying Updates
 
 ```bash
-# Frontend
-git add index.html
+# Frontend — index.html is the landing page, app.html is the tool
+git add index.html app.html
 git commit -m "your change"
 git push
 

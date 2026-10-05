@@ -142,11 +142,16 @@ This section previously documented rotating the old shared `HASH` password. That
 
 ## 8. Deploying Changes
 
-The tool is a single file — `index.html`. There is no build step.
+The site is static HTML with no build step:
+
+- `index.html` — marketing landing page served at `/`
+- `app.html` — the tool itself (sign-in, analysis, billing), served at `/app.html`
+
+Landing-page CTAs link to `/app.html?auth=signup` / `?auth=signin`, which open the app's sign-in panel directly. Supabase auth redirects (`redirectTo` = site origin) and other auth returns still arrive at `/`; a small script at the top of `index.html` forwards any URL carrying auth tokens/codes (`#access_token`, `?code=`, `?reset=1`, errors) to `/app.html` with the query and hash intact. Don't remove it unless `/app.html` is added to Supabase's Redirect URLs allowlist and the `redirectTo` values in `app.html` are updated.
 
 ```bash
-# Make your edits to index.html, then:
-git add index.html
+# Make your edits to index.html / app.html, then:
+git add index.html app.html
 git commit -m "describe your change"
 git push
 ```
@@ -182,7 +187,7 @@ GitHub Pages can take up to 2 minutes to propagate. Hard-refresh the browser: `C
 
 ### Site shows 404
 - Confirm GitHub Pages is enabled: repo Settings → Pages → Source: `main` branch, `/ (root)` folder
-- Confirm `index.html` exists at the root of the repo (not in a subfolder)
+- Confirm `index.html` and `app.html` exist at the root of the repo (not in a subfolder)
 
 ### Mixed content / fonts not loading
 The tool loads fonts from `fonts.googleapis.com`. Some networks or browser extensions block Google Fonts. The tool still works — it falls back to the system monospace font. No action needed.
