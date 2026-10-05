@@ -1,0 +1,111 @@
+/* Shared theme for CoreDumpAnalyzer static pages (privacy, terms, refund).
+   Mirrors the palette, type and header/footer of the landing page (index.html). */
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --paper:#f3ece2;
+  --paper2:#ece3d6;
+  --ink:#1c1915;
+  --ink2:#4a443c;
+  --ink3:#8a8073;
+  --ember:#e26a3a;
+  --ember-d:#c4542a;
+  --line:#d9cfbe;
+  --card:#fbf7f0;
+  --green:#4f8a56;
+  --amber:#b8862b;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#15120e;--paper2:#1b1813;--ink:#f2ece1;--ink2:#c8bfb0;
+    --ink3:#8a8073;--line:#2e2920;--card:#1d1a14;--green:#7fb886;--amber:#d9a94a;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#15120e;--paper2:#1b1813;--ink:#f2ece1;--ink2:#c8bfb0;
+  --ink3:#8a8073;--line:#2e2920;--card:#1d1a14;--green:#7fb886;--amber:#d9a94a;
+}
+*{margin:0;padding:0;box-sizing:inherit}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:'Inter',system-ui,sans-serif;font-size:16px;line-height:1.7;
+  background-image:radial-gradient(var(--line) 0.5px,transparent 0.5px);
+  background-size:22px 22px;
+}
+a{color:inherit;text-decoration:none}
+::selection{background:var(--ember);color:#fff}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* header */
+header{position:sticky;top:0;z-index:50;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  background:color-mix(in srgb, var(--paper) 82%, transparent);
+  border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top,0px);}
+.nav{display:flex;align-items:center;justify-content:space-between;height:60px;gap:16px}
+.brand{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:15px;letter-spacing:-.3px;display:flex;align-items:center;gap:9px;white-space:nowrap}
+.brand .mk{color:var(--ember)}
+.nav-links{display:flex;align-items:center;gap:22px;font-size:14px;color:var(--ink2)}
+.nav-links a{transition:color .15s}
+.nav-links a:hover{color:var(--ink)}
+.nav-cta{background:var(--ink);color:var(--paper);padding:8px 16px;border-radius:999px;font-weight:500;font-size:13.5px;transition:transform .15s,background .15s;white-space:nowrap}
+.nav-cta:hover{transform:translateY(-1px);background:var(--ember);color:#fff}
+@media(max-width:680px){.nav-links a.hide-sm{display:none}}
+
+/* page hero */
+.doc-hero{padding-block:64px 28px}
+.wrap.doc-hero,.wrap.doc{max-width:808px}
+.eyebrow{font-family:'JetBrains Mono',monospace;font-size:12.5px;letter-spacing:1px;color:var(--ember);text-transform:lowercase;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.eyebrow::before{content:"";width:22px;height:1.5px;background:var(--ember)}
+.doc-hero h1{font-family:'Fraunces',Georgia,serif;font-weight:900;font-size:clamp(38px,7vw,64px);line-height:1;letter-spacing:-1px;margin-bottom:16px}
+.doc-hero h1 .it{font-style:italic;font-weight:600;color:var(--ember)}
+.doc-hero p{color:var(--ink2);max-width:560px;font-size:17px}
+.doc-date{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--ink3);margin-top:12px}
+
+/* document body */
+.doc{padding-bottom:80px}
+.doc-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:clamp(22px,4vw,44px)}
+.doc h2{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:23px;letter-spacing:-.3px;margin:34px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.doc h2:first-child{margin-top:0}
+.doc h3{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:var(--ember);text-transform:uppercase;letter-spacing:.6px;margin:22px 0 8px}
+.doc p,.doc li{color:var(--ink2);font-size:15.5px}
+.doc p{margin-bottom:12px}
+.doc ul{padding-left:22px;margin-bottom:12px}
+.doc li{margin-bottom:6px}
+.doc li::marker{color:var(--ember)}
+.doc strong{color:var(--ink);font-weight:600}
+.doc a{color:var(--ember);text-decoration:underline;text-underline-offset:2px}
+.doc a:hover{color:var(--ember-d)}
+.doc .section{margin-bottom:8px}
+
+/* callout boxes */
+.box{border:1px solid var(--line);border-left:3px solid var(--ember);border-radius:12px;padding:18px 22px;margin:16px 0;background:var(--paper2)}
+.box.green{border-left-color:var(--green)}
+.box.amber{border-left-color:var(--amber)}
+.box-title{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;color:var(--ember)}
+.box.green .box-title{color:var(--green)}
+.box.amber .box-title{color:var(--amber)}
+.box p{margin:0;color:var(--ink2)}
+
+/* tables */
+.table-scroll{overflow-x:auto;margin:16px 0}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{background:var(--paper2);color:var(--ink3);font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:10px 14px;text-align:left;border:1px solid var(--line)}
+td{padding:10px 14px;border:1px solid var(--line);color:var(--ink2)}
+td:first-child{color:var(--ink);font-weight:600}
+
+/* contact */
+.contact-box{border:1.5px dashed var(--line);border-radius:14px;padding:26px;margin-top:34px;text-align:center}
+.contact-box h3{font-family:'Fraunces',Georgia,serif;font-size:21px;font-weight:700;color:var(--ink);text-transform:none;letter-spacing:0;margin:0 0 6px}
+.contact-box p{margin-bottom:4px}
+.contact-note{font-size:13px!important;color:var(--ink3)!important;margin-top:8px}
+
+/* footer */
+footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--ink3);font-size:13.5px}
+.foot-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+.foot-links{display:flex;gap:20px;flex-wrap:wrap}
+.foot-links a:hover{color:var(--ink)}

@@ -146,6 +146,10 @@ The site is static HTML with no build step:
 
 - `index.html` — marketing landing page served at `/`
 - `app.html` — the tool itself (sign-in, analysis, billing), served at `/app.html`
+- `privacy.html`, `terms.html`, `refund.html` — legal pages; they share `assets/site.css`, which mirrors the landing page's theme (warm paper + ember `#e26a3a`, Fraunces / Inter / JetBrains Mono)
+- `assets/` — demo video, poster, shared stylesheet
+
+`app.html` has no in-app landing any more: signed-out visitors go straight to the sign-in panel, and signing out returns to `/`.
 
 Landing-page CTAs link to `/app.html?auth=signup` / `?auth=signin`, which open the app's sign-in panel directly. Supabase auth redirects (`redirectTo` = site origin) and other auth returns still arrive at `/`; a small script at the top of `index.html` forwards any URL carrying auth tokens/codes (`#access_token`, `?code=`, `?reset=1`, errors) to `/app.html` with the query and hash intact. Don't remove it unless `/app.html` is added to Supabase's Redirect URLs allowlist and the `redirectTo` values in `app.html` are updated.
 
